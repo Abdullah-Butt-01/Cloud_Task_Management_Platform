@@ -27,3 +27,5 @@ jobs:
 
     - name: Push Docker Image
       run: docker push ${{ secrets.DOCKER_USERNAME }}/task-platform:latest
+
+# Modifying secrets to test CI again
