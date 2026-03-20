@@ -2,13 +2,20 @@ from flask import Flask
 from app import db
 import os # For reading Environment variables (env)
 
-import redis
-
-redis_host = os.getenv("REDIS_HOST", "redis")
-r = redis.Redis(host=redis_host, port=6379)
+from rq import Queue
+from app.worker import background_job
+from redis import Redis
 
 def create_app(): # Instead creatting globally, create inside function to avoid circular imports
     app = Flask(__name__)
+
+    print("Create_app is running")
+
+    redis_host = os.getenv("REDIS_HOST", "redis")
+    r = Redis(host=redis_host, port=6379)
+
+    q = Queue(connection=r)
+
     app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv(
         "DATABASE_URL",
         "postgresql://postgres:password@db:5432/tasks"
@@ -33,8 +40,21 @@ def create_app(): # Instead creatting globally, create inside function to avoid 
         count = r.incr("hits")
         return {"message": f"Task Platform API running - visit: {count}"}
 
+
+    @app.route("/task/<int:n>")
+    def add_task(n):
+        print(f"Received task {n}")
+        job = q.enqueue(background_job, n)
+        return {"message": f"Task {n} added to queue", "job_id": job.id}
+
     return app
 
 if __name__ == "__main__":
     app = create_app()
     app.run(host="0.0.0.0", port=5000, debug=True)
+
+
+
+
+
+

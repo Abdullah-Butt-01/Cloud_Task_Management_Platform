@@ -14,6 +14,15 @@ services: # everything inside this are containers
       - db
       - redis
 
+  worker:
+    build: .
+    container_name: task-worker
+    command: python -m app.worker
+    environment:
+      - REDIS_HOST=redis
+    depends_on:
+      - redis
+
   db:
     image: postgres:13 # ready made image
     container_name: postgres-db

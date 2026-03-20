@@ -12,7 +12,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app/ ./app
 
 # Set environment variables
-ENV FLASK_APP=app/app.py
+ENV FLASK_APP=app.app:create_app
 ENV FLASK_RUN_HOST=0.0.0.0
 ENV FLASK_RUN_PORT=5000
 
