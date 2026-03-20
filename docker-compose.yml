@@ -3,7 +3,7 @@ version: "3.9"
 services: # everything inside this are containers
 
   api:
-    build: .
+    build: abdullahbutt01/task-platform:latest
     container_name: task-api
     ports:
       - "5000:5000"
@@ -15,7 +15,7 @@ services: # everything inside this are containers
       - redis
 
   worker:
-    build: .
+    build: abdullahbutt01/task-platform:latest
     container_name: task-worker
     command: python -m app.worker
     environment:
