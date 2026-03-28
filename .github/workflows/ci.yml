@@ -28,21 +28,51 @@ jobs:
     - name: Push Docker Image
       run: docker push ${{ secrets.DOCKER_USERNAME }}/task-platform:latest
 
-#  deploy:
+  deploy:
 
-#    needs: build
-#    runs-on: ubuntu-latest
+    needs: build
+    runs-on: ubuntu-latest
 
-#    steps:
+    steps:
+    - name: Deploy to VM via SSH
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.SERVER_IP }}
+        username: ${{ secrets.SERVER_USER }}
+        key: ${{ secrets.DEPLOY_KEY }}
+        port: 22
+        timeout: 60s
+        command_timeout: 10m
+        debug: true
+        script: |
+          set -e
+          set -x
 
-#    - name: Deploy to VM via SSH
-#      uses: appleboy/ssh-action@master
-#      with:
-#        host: ${{ secrets.SERVER_IP }}
-#        username: ${{ secrets.SERVER_USER }}
-#        password: ${{ secrets.SERVER_PASS }}
-#        script: |
-#          cd task-platform-devops
-#          docker compose down
-#          docker compose pull
-#          docker compose up -d
+          echo "===== CONNECTED TO VM ====="
+          whoami
+          hostname
+          pwd
+
+          echo "===== FILES IN HOME ====="
+          ls -la
+
+          echo "===== ENTER PROJECT ====="
+          cd task-platform-devops || exit 1
+
+          echo "===== PROJECT FILES ====="
+          ls -la
+
+          echo "===== DOCKER STATUS ====="
+          docker ps
+
+          echo "===== PULL IMAGE ====="
+          docker compose pull
+
+          echo "===== STOP OLD CONTAINERS ====="
+          docker compose down
+
+          echo "===== START NEW CONTAINERS ====="
+          docker compose up -d
+
+          echo "===== FINAL STATUS ====="
+          docker ps
