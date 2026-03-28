@@ -45,6 +45,7 @@ jobs:
         command_timeout: 10m
         debug: true
         script: |
+          echo "Key exists check"
           set -e
           set -x
 
