@@ -131,3 +131,11 @@
 
 * Instead of manual duplication of workers, use flag during build
 	- docker compose up --build -d --scale worker=n
+
+# Logging and Observability
+
+## 5.1 : Logging and Observability
+
+* Added logging in API routes
+* Added logging in worker jobs
+* Ran the system and observed using logs

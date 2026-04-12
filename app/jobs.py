@@ -3,6 +3,9 @@ import time
 from app.models.task import Task
 import random
 
+import logging
+logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
+
 def process_report(task_id):
 
     """
@@ -26,6 +29,7 @@ def process_report(task_id):
 
 
 def background_job(task_id, n, delay):
+    logging.info(f"[WORKER] [TASK {task_id}] with n={n} START")
 
     task = Task.query.get(task_id)
 
@@ -33,10 +37,9 @@ def background_job(task_id, n, delay):
      #   return
 
     try:
-        print(f"Starting task {task_id}")
-
         task.status = "started"
         db.session.commit()
+        logging.info(f"[WORKER] [TASK {task_id}] status: started")
 
         time.sleep(delay)
 
@@ -49,13 +52,17 @@ def background_job(task_id, n, delay):
         task.status = "finished"
         task.result = result
         db.session.commit()
-        print(f"Task {n} completed")
+        logging.info(f"[WORKER] [TASK {task_id}] status: finished")
+
+        logging.info(f"[WORKER] [TASK {task_id}] SUCCESS")
+
         return result
 
 
 
-    except Exception:
+    except Exception as e:
         task.status = "failed"
         db.session.commit()
-        print(f"Task {n} failed!")
+        logging.error(f"[WORKER] [Task {task_id}] FAILED : {e}")
+
         return None

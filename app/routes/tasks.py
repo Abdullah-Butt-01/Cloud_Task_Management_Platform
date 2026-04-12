@@ -10,6 +10,9 @@ from app.models.user import User
 
 from app.jobs import background_job, process_report
 
+import logging
+logging.basicConfig(level=logging.INFO)
+
 rapp = Blueprint("tasks", __name__)
 
 @rapp.route("/tasks", methods=["POST"])
@@ -104,7 +107,11 @@ def run_task(n):
 # Fifth route /task/n For new worker job >jobs.py
 @rapp.route("/task/<int:n>")
 def run_task(n):
+    logging.info(f"[API] Received task request: n={n}")
+
     user_id = request.args.get("user_id", type=int)
+    logging.info(f"[API] User ID: {user_id}")
+
     job_type = request.args.get("type", default="square")
 
     task = Task(number=n, status="queued", user_id=user_id)
@@ -115,6 +122,8 @@ def run_task(n):
         job = queue.enqueue(process_report, task.id)
     else:
         job = queue.enqueue(background_job, task.id, n, 5)
+
+    logging.info(f"[API] Task {task.id} queued with job-id {job.id}")
 
     return {"task_id": task.id, "job_id": job.id, "type": job_type}
 
