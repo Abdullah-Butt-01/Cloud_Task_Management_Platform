@@ -6,6 +6,8 @@ import random
 import logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
 
+MAX_RETRIES = 3
+
 def process_report(task_id):
 
     """
@@ -33,8 +35,9 @@ def background_job(task_id, n, delay):
 
     task = Task.query.get(task_id)
 
-    #if task.status != "queued":
-     #   return
+    if not task:
+      logging.error(f"[WORKER] [TASK {task_id}] Task not found")
+      return
 
     try:
         task.status = "started"
@@ -65,4 +68,18 @@ def background_job(task_id, n, delay):
         db.session.commit()
         logging.error(f"[WORKER] [Task {task_id}] FAILED : {e}")
 
+        task.retry_count += 1
+
+        if task.retry_count < MAX_RETRIES:
+          logging.info(f"[WORKER] [TASK {task_id}] RETRY {task.retry_count}")
+
+          db.session.commit()
+          # Retry
+          background_job(task_id, n, delay)
+
+        else:
+          task.status = "failed"
+          db.session.commit()
+
+          logging.error(f"[WORKER] [TASK {task_id}] PERMANENT FAILURE")
         return None

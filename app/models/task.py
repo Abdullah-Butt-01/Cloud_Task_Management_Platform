@@ -11,3 +11,13 @@ class Task(db.Model):
 
     #Connecting Task to User, each task belongs to one user
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"))
+
+    retry_count = db.Column(db.Integer, default=0)
+    def to_dict(self):
+      return{
+	"task_id": self.id,
+	"number": self.number,
+	"status": self.status,
+	"result": self.result,
+	"user_id": self.user_id
+    }
