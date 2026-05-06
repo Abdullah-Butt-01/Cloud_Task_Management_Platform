@@ -90,3 +90,40 @@ def get_task(task_id):
         return error_response("Task not found", 404)
 
     return success_response(task.to_dict())
+
+
+@rapp.route("/debug/tasks", methods=["GET"])
+def debug_tasks():
+    status = request.args.get("status")
+
+    query = Task.query
+
+    if status:
+      query = query.filter_by(status=status)
+
+    tasks = query.all()
+
+    data = []
+
+    total = len(tasks)
+    finished = len([t for t in tasks if t.status == "finished"])
+    failed = len([t for t in tasks if t.status == "failed"])
+
+    for task in tasks:
+      data.append({
+        "id": task.id,
+        "number": task.number,
+        "status": task.status,
+        "result": task.result,
+        "user_id": task.user_id,
+        "retry_count": task.retry_count
+      })
+
+    return success_response({
+      "summary": {
+	"total": total,
+	"finished": finished,
+	"failed": failed
+      },
+      "tasks": data
+    })

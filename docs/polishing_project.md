@@ -50,3 +50,9 @@
 * Used logger in worker, API
 * Watched real time logs
 
+## 4.1 : Debug Endpoint (System Visibility API)
+
+* Created a new route /debug/tasks
+* Tested it
+* Added filtering "status"
+* Added summary
