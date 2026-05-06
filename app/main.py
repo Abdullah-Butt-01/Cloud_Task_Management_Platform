@@ -4,12 +4,14 @@ import os # For reading Environment variables (env)
 
 from sqlalchemy.exc import OperationalError
 import time
-#time.sleep(10)
 
-def create_app(): # Instead creatting globally, create inside function to avoid circular imports
+from app.utils.logger import setup_logger
+
+def create_app(): # Instead creating globally, create inside function to avoid circular imports
     app = Flask(__name__)
+    print("create_app() is running")
 
-    print("Create_app is running")
+    setup_logger()
 
     app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv(
         "DATABASE_URL",
@@ -22,6 +24,9 @@ def create_app(): # Instead creatting globally, create inside function to avoid 
     # import models AFTER db.init_app (database instance should exist first)
     from app.models.task import Task
     from app.models.user import User
+
+    from app.scheduler import start_scheduler
+    start_scheduler(app)
 
     # --- Wait for DB to be ready ---
     for i in range(10):  # try 10 times
@@ -48,7 +53,7 @@ def create_app(): # Instead creatting globally, create inside function to avoid 
 
 if __name__ == "__main__":
     app = create_app()
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    app.run(host="0.0.0.0", port=5000, debug=True, use_reloader=False)
 
 
 
