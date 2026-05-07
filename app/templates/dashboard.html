@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Task Dashboard</title>
+    <meta http-equiv="refresh", content="5">
+</head>
+<body>
+
+<h1>Task Dashboard</h1>
+
+<table border="1">
+    <tr>
+        <th>ID</th>
+        <th>Number</th>
+        <th>Status</th>
+        <th>Result</th>
+        <th>User</th>
+        <th>Retries</th>
+    </tr>
+
+    {% for task in tasks %}
+    <tr>
+        <td>{{ task.id }}</td>
+        <td>{{ task.number }}</td>
+        <td>{{ task.status }}</td>
+        <td>{{ task.result }}</td>
+        <td>{{ task.user_id }}</td>
+        <td>{{ task.retry_count }}</td>
+    </tr>
+    {% endfor %}
+
+</table>
+
+</body>
+</html>

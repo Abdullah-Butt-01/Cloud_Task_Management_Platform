@@ -1,6 +1,7 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, render_template
 from ..extensions import db, redis_conn, queue
 from redis import Redis
+import time
 import os
 
 from rq.job import Job
@@ -13,10 +14,10 @@ from app.jobs import background_job, process_report
 from app.utils.response import success_response, error_response
 from app.utils.task_service import mark_stale_tasks
 from app.utils.logger import log_message
-
 import logging
 
 rapp = Blueprint("tasks", __name__)
+r = Redis(host="redis", port=6379, decode_responses=True)
 
 @rapp.route("/")
 def home():
@@ -127,3 +128,30 @@ def debug_tasks():
       },
       "tasks": data
     })
+
+
+@rapp.route("/debug/workers", methods=["GET"])
+def debug_workers():
+    keys = r.keys("worker:*:heartbeat")
+
+    workers = []
+
+    for key in keys:
+      worker_name = key.split(":")[1]
+      last_seen = float(r.get(key))
+
+      alive = (time.time() - last_seen) < 10
+
+      workers.append({
+        "worker": worker_name,
+        "last_seen": last_seen,
+        "status":"alive" if alive else "dead"
+      })
+    return success_response(workers)
+
+
+@rapp.route("/dashboard")
+def dashboard():
+    tasks = Task.query.order_by(Task.id.desc()).all()
+
+    return render_template("dashboard.html", tasks=tasks)

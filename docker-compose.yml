@@ -19,7 +19,7 @@ services: # everything inside this are containers
 
   worker:
     build: . #abdullahbutt01/task-platform:latest
-    container_name: task-worker
+    #container_name: task-worker
     command: python -m app.worker
     environment:
       - REDIS_HOST=redis

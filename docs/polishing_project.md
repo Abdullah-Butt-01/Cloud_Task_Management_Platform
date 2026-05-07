@@ -56,3 +56,18 @@
 * Tested it
 * Added filtering "status"
 * Added summary
+
+## 4.2 : Worker Health + Heartbeat
+
+* In workerfile, added redis, heartbeat function, and started heartbeat thread
+* Created new health api /debug/workers
+* Tested by scaling and stopping wokrers
+
+## 5.1 : Simple Dashboard (UI view)
+
+* Created file /app/templates/dashboard.html
+* Added dashboard route
+* Created HTML UI
+
+
+## Completed! Date : 06:05:2026
