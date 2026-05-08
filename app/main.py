@@ -45,6 +45,9 @@ def create_app(): # Instead creating globally, create inside function to avoid c
     from app.routes.tasks import rapp
     app.register_blueprint(rapp) # add routes to the application
 
+    from app.routes.upload_routes import upload_bp
+    app.register_blueprint(upload_bp)
+
     ''' create tables (for development)
     with app.app_context():
         db.create_all()

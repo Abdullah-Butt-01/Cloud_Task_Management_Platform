@@ -16,6 +16,9 @@ services: # everything inside this are containers
       - redis
     env_file:
       - .env
+    volumes:
+      - .:/app
+      - ./uploads:/app/uploads
 
   worker:
     build: . #abdullahbutt01/task-platform:latest
