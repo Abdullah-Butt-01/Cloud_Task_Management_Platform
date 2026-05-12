@@ -1,111 +1,101 @@
-from .extensions import db
-import time
-from app.models.task import Task
-import random
 from datetime import datetime
-from app.utils.logger import log_message
+import os
 
-import logging
+from app.extensions import db, queue
+from app.models.file_job import FileJob
+from app.utils.logger import log_message
 
 MAX_RETRIES = 3
 
-def process_report(task_id):
 
-    """
-    Example job: simulates processing a report for a task
-    """
-    task = Task.query.get(task_id)
-    if not task:
-        print(f"Task {task_id} not found!")
-        return
-
-    print(f"Processing report for Task {task_id}...")
-    task.status = "processing"
-    db.session.commit()
-
-    # simulate work
-    time.sleep(5)
-
-    task.status = "done"
-    db.session.commit()
-    print(f"Task {task_id} completed!")
+def count_text_stats(content):
+    return {
+        "word_count": len(content.split()),
+        "line_count": len(content.splitlines()),
+        "character_count": len(content),
+    }
 
 
-def background_job(task_id, n, delay):
-    logging.info(f"[WORKER] [TASK {task_id}] [USER {task.user_id}] with n={n} START")
+def process_text_file(file_job_id):
+    file_job = FileJob.query.get(file_job_id)
 
-    task = Task.query.get(task_id)
-
-    if not task:
-      logging.error(f"[WORKER] [TASK {task_id}] Task not found")
-      return
+    if not file_job:
+        log_message("WORKER", "File job not found", file_job_id=file_job_id)
+        return None
 
     try:
-        task.status = "started"
-        task.started_at = datetime.utcnow()
+        file_job.status = "processing"
+        file_job.started_at = datetime.utcnow()
+        file_job.error_message = None
         db.session.commit()
-        #logging.info(f"[WORKER] [TASK {task_id}] status: started")
-        log_message(
-          "WORKER",
-          "Task started",
-          task_id=task_id,
-          user_id=user_id
-        )
 
-        time.sleep(delay)
+        log_message("WORKER", "File processing started", file_job_id=file_job.id)
 
-        # 🔥 failure simulation
-        if n == 5:
-            raise Exception("Simulated failure")
+        if not os.path.exists(file_job.file_path):
+            raise FileNotFoundError("Uploaded file was not found")
 
-        result = n * n
+        if not file_job.original_filename.lower().endswith(".txt"):
+            raise ValueError("Only .txt files can be processed")
 
-        task.status = "finished"
-        task.result = result
+        with open(file_job.file_path, "r", encoding="utf-8") as text_file:
+            content = text_file.read()
+
+        stats = count_text_stats(content)
+
+        file_job.word_count = stats["word_count"]
+        file_job.line_count = stats["line_count"]
+        file_job.character_count = stats["character_count"]
+        file_job.status = "completed"
+        file_job.completed_at = datetime.utcnow()
         db.session.commit()
-        #logging.info(f"[WORKER] [TASK {task_id}] status: finished")
 
-        #logging.info(f"[WORKER] [TASK {task_id}] SUCCESS")
-        log_message(
-          "WORKER",
-          f"Task finished result={result}",
-          task_id=task_id,
-          user_id=user_id
-        )
+        log_message("WORKER", "File processing completed", file_job_id=file_job.id)
 
-        return result
+        return file_job.to_dict()
 
+    except Exception as error:
+        file_job.retry_count += 1
+        file_job.error_message = str(error)
 
+        if file_job.retry_count < MAX_RETRIES:
+            file_job.status = "queued"
+            db.session.commit()
 
-    except Exception as e:
-        task.status = "failed"
-        db.session.commit()
-        #logging.error(f"[WORKER] [Task {task_id}] FAILED : {e}")
-        log_message(
-          "WORKER",
-          f"Task failed error={str(e)} retry={task.retry_count}",
-          task_id=task_id,
-          user_id=user_id
-        )
+            retry_job = queue.enqueue(process_text_file, file_job.id)
+            file_job.rq_job_id = retry_job.id
+            db.session.commit()
 
-        task.retry_count += 1
-
-        if task.retry_count < MAX_RETRIES:
-          #logging.info(f"[WORKER] [TASK {task_id}] RETRY {task.retry_count}")
-          log_message(
-            "WORKER",
-            f"Retrying attempt={task.retry_count}",
-            task_id=task_id,
-            user_id=user_id
-          )
-
-          db.session.commit()
-          # Retry
-          background_job(task_id, n, delay)
-
+            log_message(
+                "WORKER",
+                f"File processing retry queued: attempt={file_job.retry_count}",
+                file_job_id=file_job.id,
+            )
         else:
-          task.status = "failed"
-          db.session.commit()
+            file_job.status = "failed"
+            file_job.completed_at = datetime.utcnow()
+            db.session.commit()
 
-          logging.error(f"[WORKER] [TASK {task_id}] PERMANENT FAILURE")
+            log_message(
+                "WORKER",
+                f"File processing failed permanently: {error}",
+                file_job_id=file_job.id,
+            )
+
         return None
+
+
+def generate_file_report():
+    file_jobs = FileJob.query.all()
+
+    report = {
+        "total": len(file_jobs),
+        "queued": len([job for job in file_jobs if job.status == "queued"]),
+        "processing": len([job for job in file_jobs if job.status == "processing"]),
+        "completed": len([job for job in file_jobs if job.status == "completed"]),
+        "failed": len([job for job in file_jobs if job.status == "failed"]),
+        "generated_at": datetime.utcnow().isoformat(),
+    }
+
+    log_message("WORKER", f"File report generated: {report}")
+
+    return report

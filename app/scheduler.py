@@ -1,6 +1,5 @@
 from apscheduler.schedulers.background import BackgroundScheduler
-from app.utils.task_service import mark_stale_tasks
-import os
+from app.utils.task_service import mark_stale_file_jobs
 import logging
 
 #logger = logging.getLogger(__name__)
@@ -9,7 +8,7 @@ scheduler = BackgroundScheduler()
 
 def run_scheduler_job(app):
     with app.app_context():
-      mark_stale_tasks()
+      mark_stale_file_jobs()
 
 def start_scheduler(app):
 

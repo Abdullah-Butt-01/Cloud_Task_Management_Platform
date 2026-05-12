@@ -1,31 +1,35 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Task Dashboard</title>
-    <meta http-equiv="refresh", content="5">
+    <title>File Processing Dashboard</title>
+    <meta http-equiv="refresh" content="5">
 </head>
 <body>
 
-<h1>Task Dashboard</h1>
+<h1>File Processing Dashboard</h1>
 
 <table border="1">
     <tr>
         <th>ID</th>
-        <th>Number</th>
+        <th>Filename</th>
         <th>Status</th>
-        <th>Result</th>
-        <th>User</th>
+        <th>Words</th>
+        <th>Lines</th>
+        <th>Characters</th>
         <th>Retries</th>
+        <th>Error</th>
     </tr>
 
-    {% for task in tasks %}
+    {% for file_job in file_jobs %}
     <tr>
-        <td>{{ task.id }}</td>
-        <td>{{ task.number }}</td>
-        <td>{{ task.status }}</td>
-        <td>{{ task.result }}</td>
-        <td>{{ task.user_id }}</td>
-        <td>{{ task.retry_count }}</td>
+        <td>{{ file_job.id }}</td>
+        <td>{{ file_job.original_filename }}</td>
+        <td>{{ file_job.status }}</td>
+        <td>{{ file_job.word_count if file_job.word_count is not none else "" }}</td>
+        <td>{{ file_job.line_count if file_job.line_count is not none else "" }}</td>
+        <td>{{ file_job.character_count if file_job.character_count is not none else "" }}</td>
+        <td>{{ file_job.retry_count }}</td>
+        <td>{{ file_job.error_message or "" }}</td>
     </tr>
     {% endfor %}
 

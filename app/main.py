@@ -24,6 +24,7 @@ def create_app(): # Instead creating globally, create inside function to avoid c
     # import models AFTER db.init_app (database instance should exist first)
     from app.models.task import Task
     from app.models.user import User
+    from app.models.file_job import FileJob
 
     from app.scheduler import start_scheduler
     start_scheduler(app)

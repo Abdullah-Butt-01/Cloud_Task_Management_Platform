@@ -11,8 +11,8 @@ r = redis.Redis(host="redis", port=6379, decode_responses=True)
 
 def send_heartbeat(worker_name):
     while True:
-      print(f"heatrbeat from {worker_name}")
-      r.set(f"worker: {worker_name}:heartbeat", time.time())
+      print(f"heartbeat from {worker_name}")
+      r.set(f"worker:{worker_name}:heartbeat", time.time())
       time.sleep(5)
 
 app = create_app()
