@@ -1,0 +1,173 @@
+Page 1:
+PROBLEM ANALYSTS ROADMAP
+
+Rapid Problem-Spotting Checklist
+
+1) Observe Daily Frustrations:
+i) Look for people repeating the same complaints: delays, costs, lack of info, inconvenience
+
+2) Identify Gaps in Access or Inclusion's:
+i) Notice if certain groups lack access to basic services (healthcare, education, transportation, finance).
+
+3) Watch for Waste or Inefficiency:
+i) Food waste, unused books, idle park spots. Ask. How could this be repurposed or reallocated?
+
+4) Spot Friction Points in Routine Processes?
+i) Pinpoint steps that repeatedly slow down people (manual work, paperwork, unreliable communication)
+
+5) Listen for Systematic or Structural Issues.
+i) Lack of trust in institutions, unclear regulations, gender or caste based barriers.
+
+6) Capture Emerging Trend Anxieties:
+i) Digital Privacy, Environmental Degradation
+
+7) Look for Under-served Groups.
+i) Identify age groups, income levels, or professions that lack certain products or services.
+
+8) Scan Online Communities & Social Media:
+i) Notice Pattern of complaints
+
+Page 2:
+In-Depth Problem Validation (whether it's worth building a solution around or not)
+1) Severity of Pain
+  ⅰ) People spend excessive time, money or emotional energy
+  Signals: Frequent complaints,
+2) Frequency
+  ⅰ) Large no. of people experience the pain repeatedly.
+  Signals: Lines at clinic, crowded waiting rooms, long queues at counters
+3) Willingness to Pay (WTP)
+  ⅰ) People already spend money on makeshift.
+4) Lack of effective alternatives
+  ⅰ) Existing solutions are expensive, unreliable, or unavailable locally
+5) Social Impact & Urgency
+  ⅰ) Will addressing the problem could drastically improve quality of life or safety.
+6) Scalebiliti Potential
+  ⅰ) The problem exists in multiple neighborhoods, cities or regions.
+7) Ease of Early Adoption
+  ⅰ) A minimum viable product or service (MVP or MVS) can be tested quickly to gather feedback.
+
+Root Cause Analysis (This prevents from quick fixes that won't last)
+1) Five "Why's" (Fishbone) repeatedly:
+2) Ecosystem Mapping:
+  ⅰ) List all stakeholders:
+     a) Primary (those directly affected)
+     b) Secondary (indirectly involved).
+
+
+Page 3:
+Ideation: Generating Solution Concepts
+
+1) Jobs-To-Be-Done (JBTD) Lens
+    i) Ask: What do customers hire this product/service to do?
+
+2) SCAMPER Technique:
+    * Substitute: Replace a manual process with technology
+    * Combine: Merge two services
+    * Adapt: Take a successful model from another city
+    * Modify: Increase a key feature
+    * Put to another Use:
+        * Eliminate: Remove unnecessary middleman
+        * Reverse: Flip how service is delivered
+        * Rearrange
+3) Construct a list of Possible Solutions
+
+4) Customer Interviews:
+    i) Conduct quick 5-10 min chats with affected people.
+    ii) Capture: Says, Thinks, Does, Feels.
+
+Impact Scoring
+
+For each solution idea, quickly score it on two axes:
+a) Ease of implementation        b) Potential Impact
+Use (1-5) scale
+
+Page 4:
+Risk Assessment
+1) Regulatory & Compliance Risk
+What permits, licenses, or approvals does my solution need?
+How stable they are?
+
+2) Cultural & Behavioral Risk
+Will people easily change their current habits?
+Are there social or cultural norms that might resist my solution?
+
+3) Operational Complexity Risk
+How many moving parts are there?
+Which processes are manual & prone to error?
+
+4) Funding & Financial Risk
+What is the total cost to start and run
+What if actual usage is half?
+
+5) Technology Adoption & Reliability Risk
+Do the target users have devices, connectivity and skills?
+How reliable is our technology in crisis scenarios?
+
+6) Competitive Risk
+Could established players replicate my idea quickly?
+Are there cheaper or free alternatives available?
+
+7) Scalability Limitations
+As demand grows, will costs grow faster than revenue?
+Are there bottlenecks that will choke expansion?
+
+8) Timing & Market Readiness Risk
+Is the market ready for the solution, or does infrastructure need to improve first?
+Are there alternative trends that could obsolete the idea?
+
+Page 5:
+Prototyping and Testing Phase
+1) Define Minimum Viable Concept (MVC)
+2) Identify Pilot Audience
+   i) Choose a small segment of users
+   ii) Ask for honest feedback
+3) Collect Data and Feedback
+4) Iterate: Make changes quickly if required, ask the same group to validate improvements.
+5) Measure Social Impact
+6) Track all revenues
+
+Scaling Strategy
+A. Resource Mapping for Scale
+1) Capital Needs: i) List all equipments, technology, budget and fee
+ ii) Estimate how much capital is required
+2) Talent & Roles: i) Identify new roles (Manager, Supervisor, Customer Care)
+ ii) Document skills & experience required
+3) Systems & Processes: i) SOPs
+4) Partnership & Network: Formal agreements with other institutions required
+
+Sustaining and Evolving
+1) Monitor Emergent Issues Internally
+2) Continuously Scan for External Changes
+  i) Stay alert for policy shifts, competitor moves, or tech advancements.
+  ii) Adjust your model as needed
+3) Customer Feedback Loop
+  i) Ask for any improvements or pain points
+4) Brand & Community Building
+  i) Sponsor Local events
+  ii) Highlight Social Proofs
+  ii) Create user content campaigns
+
+Page 6:
+5) Expand Adjacent Services
+6) Build a Learning Organization
+i) Encourage a culture where employees suggest improvements.
+
+Warnings & Common Pitfalls
+1) Overlooking Root Causes leads to Surface - Fix Mistakes
+i) Always verify root causes thoroughly
+ii) Ensure your solution addresses true pain, not symptoms
+2) Cherry Picking Anecdotes Ignoring Broader Data
+i) Look for Broader patterns, not isolated cases
+3) Underestimating Cultural & Behavioral Resistance
+4) Scaling too fast without Operational Foundations
+5) Ignoring Regulatory Shifts
+6) Focusing more on technology instead of User Needs
+i) Deliver the simplest possible solution that solves the core need, add advance features only after demand rises
+7) Neglecting Cash Flow
+i) Maintain a minimum of 3 months' operating cash for each segment.
+8) Overreliance on one customer segment or Revenue Stream
+i) Build at least 2 revenue pillars.
+9) Misreading Local Variations as Universal Truths
+i) Treat each new region as a fresh MVP
+10) Failing to build a Learning & Feedback Culture
+
