@@ -10,12 +10,10 @@ services: # everything inside this are containers
       - "5000:5000"
     environment:
       - DATABASE_URL=postgresql://postgres:password@db:5432/tasks
-      - REDIS_HOST=redis
+      - REDIS_URL=redis://redis:6379/0
     depends_on: # start db and redis before api
       - db
       - redis
-    env_file:
-      - .env
     volumes:
       - .:/app
       - ./uploads:/app/uploads
@@ -25,11 +23,13 @@ services: # everything inside this are containers
     #container_name: task-worker
     command: python -m app.worker
     environment:
-      - REDIS_HOST=redis
+      - DATABASE_URL=postgresql://postgres:password@db:5432/tasks
+      - REDIS_URL=redis://redis:6379/0
     depends_on:
+      - db
       - redis
-    env_file:
-      - .env
+    volumes:
+      - ./uploads:/app/uploads
 
   db:
     image: postgres:13 # ready made image
