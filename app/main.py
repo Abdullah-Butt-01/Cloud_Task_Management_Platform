@@ -22,8 +22,6 @@ def create_app(): # Instead creating globally, create inside function to avoid c
     db.init_app(app)  # before this, Flask and DB exists but not connected
 
     # import models AFTER db.init_app (database instance should exist first)
-    from app.models.task import Task
-    from app.models.user import User
     from app.models.file_job import FileJob
 
     from app.scheduler import start_scheduler
@@ -43,11 +41,11 @@ def create_app(): # Instead creating globally, create inside function to avoid c
 
 
     # import and register blueprints
-    from app.routes.tasks import rapp
-    app.register_blueprint(rapp) # add routes to the application
+    from app.routes.system_routes import system_bp
+    app.register_blueprint(system_bp) # add system routes to the application
 
-    from app.routes.upload_routes import upload_bp
-    app.register_blueprint(upload_bp)
+    from app.routes.file_routes import file_bp
+    app.register_blueprint(file_bp)
 
     ''' create tables (for development)
     with app.app_context():

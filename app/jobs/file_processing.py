@@ -82,20 +82,3 @@ def process_text_file(file_job_id):
             )
 
         return None
-
-
-def generate_file_report():
-    file_jobs = FileJob.query.all()
-
-    report = {
-        "total": len(file_jobs),
-        "queued": len([job for job in file_jobs if job.status == "queued"]),
-        "processing": len([job for job in file_jobs if job.status == "processing"]),
-        "completed": len([job for job in file_jobs if job.status == "completed"]),
-        "failed": len([job for job in file_jobs if job.status == "failed"]),
-        "generated_at": datetime.utcnow().isoformat(),
-    }
-
-    log_message("WORKER", f"File report generated: {report}")
-
-    return report

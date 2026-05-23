@@ -7,11 +7,11 @@ from ..extensions import queue, redis_conn
 from app.jobs import generate_file_report
 from app.utils.response import success_response
 
-rapp = Blueprint("system", __name__)
+system_bp = Blueprint("system", __name__)
 r = Redis(host="redis", port=6379, decode_responses=True)
 
 
-@rapp.route("/")
+@system_bp.route("/")
 def home():
     count = redis_conn.incr("hits")
     return {
@@ -22,7 +22,7 @@ def home():
     }
 
 
-@rapp.route("/debug/workers", methods=["GET"])
+@system_bp.route("/debug/workers", methods=["GET"])
 def debug_workers():
     keys = r.keys("worker:*:heartbeat")
     workers = []
@@ -43,7 +43,7 @@ def debug_workers():
     return success_response(workers)
 
 
-@rapp.route("/reports/files", methods=["POST"])
+@system_bp.route("/reports/files", methods=["POST"])
 def create_file_report():
     job = queue.enqueue(generate_file_report)
 

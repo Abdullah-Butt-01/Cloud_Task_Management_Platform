@@ -9,7 +9,7 @@ from app.jobs import process_text_file
 from app.models.file_job import FileJob
 from app.utils.response import error_response, success_response
 
-upload_bp = Blueprint("upload", __name__)
+file_bp = Blueprint("files", __name__)
 
 UPLOAD_FOLDER = os.getenv("UPLOAD_FOLDER", "uploads")
 ALLOWED_EXTENSION = ".txt"
@@ -19,7 +19,7 @@ def is_txt_file(filename):
     return os.path.splitext(filename)[1].lower() == ALLOWED_EXTENSION
 
 
-@upload_bp.route("/upload", methods=["POST"])
+@file_bp.route("/upload", methods=["POST"])
 def upload_file():
     if "file" not in request.files:
         return error_response("No file uploaded", 400)
@@ -62,7 +62,7 @@ def upload_file():
     )
 
 
-@upload_bp.route("/files", methods=["GET"])
+@file_bp.route("/files", methods=["GET"])
 def list_file_jobs():
     status = request.args.get("status")
 
@@ -76,7 +76,7 @@ def list_file_jobs():
     return success_response([file_job.to_dict() for file_job in file_jobs])
 
 
-@upload_bp.route("/files/<int:file_job_id>", methods=["GET"])
+@file_bp.route("/files/<int:file_job_id>", methods=["GET"])
 def get_file_job(file_job_id):
     file_job = FileJob.query.get(file_job_id)
 
@@ -86,7 +86,7 @@ def get_file_job(file_job_id):
     return success_response(file_job.to_dict())
 
 
-@upload_bp.route("/dashboard")
+@file_bp.route("/dashboard")
 def dashboard():
     file_jobs = FileJob.query.order_by(FileJob.id.desc()).all()
 
