@@ -8,28 +8,26 @@ services: # everything inside this are containers
     command: python -m app.main
     ports:
       - "5000:5000"
-    environment:
-      - DATABASE_URL=postgresql://postgres:password@db:5432/tasks
-      - REDIS_URL=redis://redis:6379/0
+    env_file:
+      - .env
     depends_on: # start db and redis before api
       - db
       - redis
     volumes:
       - .:/app
-      - ./uploads:/app/uploads
+      - ${HOST_UPLOAD_FOLDER:-./uploads}:${UPLOAD_FOLDER:-/app/uploads}
 
   worker:
     build: . #abdullahbutt01/task-platform:latest
     #container_name: task-worker
     command: python -m app.worker
-    environment:
-      - DATABASE_URL=postgresql://postgres:password@db:5432/tasks
-      - REDIS_URL=redis://redis:6379/0
+    env_file:
+      - .env
     depends_on:
       - db
       - redis
     volumes:
-      - ./uploads:/app/uploads
+      - ${HOST_UPLOAD_FOLDER:-./uploads}:${UPLOAD_FOLDER:-/app/uploads}
 
   db:
     image: postgres:13 # ready made image

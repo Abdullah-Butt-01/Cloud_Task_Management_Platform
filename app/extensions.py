@@ -1,7 +1,7 @@
 from flask_sqlalchemy import SQLAlchemy
 from redis import Redis
 from rq import Queue
-import os
+from app.config import REDIS_URL
 
 '''
 # Host + Port Method
@@ -10,8 +10,7 @@ redis_conn = Redis(host=redis_url, port=6379)
 '''
 
 # URL Method
-redis_url = os.getenv("REDIS_URL", "redis://redis:6379/0")
-redis_conn = Redis.from_url(redis_url)
+redis_conn = Redis.from_url(REDIS_URL)
 
 queue = Queue(connection=redis_conn)
 

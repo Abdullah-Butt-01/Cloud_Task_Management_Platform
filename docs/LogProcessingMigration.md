@@ -152,3 +152,95 @@ This step did not add new log-processing behavior. It made the code easier to ex
 - Utility files hold shared helper logic.
 
 This keeps future changes smaller, safer, and easier to explain.
+
+### Step 2 - Add Environment Variables
+
+#### Goal
+
+Remove hardcoded configuration values from the application and Docker Compose setup.
+
+#### What Was Already Present
+
+- `DATABASE_URL` was already read with `os.getenv` in `app/main.py`.
+- `REDIS_URL` was already read with `os.getenv` in `app/extensions.py`.
+- `UPLOAD_FOLDER` was already read with `os.getenv` in `app/routes/file_routes.py`.
+- `.env` was already listed in `.gitignore`, which is good because local environment files should not usually be committed.
+
+#### What Needed To Change
+
+- Environment variable access was scattered across multiple files.
+- `docker-compose.yml` still had `DATABASE_URL` and `REDIS_URL` hardcoded inside service definitions.
+- There was no `.env.example` file showing required environment variables.
+- Local Python runs would not automatically load `.env` without dotenv support.
+
+#### Changes Made
+
+- Added `app/config.py` as the central config module.
+- Moved application config reads into `app/config.py`:
+  - `DATABASE_URL`
+  - `REDIS_URL`
+  - `UPLOAD_FOLDER`
+- Updated `app/main.py` to use `DATABASE_URL` from config.
+- Updated `app/extensions.py` to use `REDIS_URL` from config.
+- Updated `app/routes/file_routes.py` to use `UPLOAD_FOLDER` from config.
+- Updated `docker-compose.yml` so API and worker use `env_file: .env`.
+- Made the shared uploads volume configurable:
+  - `HOST_UPLOAD_FOLDER`
+  - `UPLOAD_FOLDER`
+- Added local `.env`.
+- Added committed `.env.example`.
+- Added `python-dotenv` to `requirements.txt`.
+
+#### Files Changed
+
+- `app/config.py`
+- `app/main.py`
+- `app/extensions.py`
+- `app/routes/file_routes.py`
+- `docker-compose.yml`
+- `.env`
+- `.env.example`
+- `requirements.txt`
+- `docs/LogProcessingMigration.md`
+
+#### Environment Variables
+
+```env
+DATABASE_URL=postgresql://postgres:password@db:5432/tasks
+REDIS_URL=redis://redis:6379/0
+UPLOAD_FOLDER=/app/uploads
+HOST_UPLOAD_FOLDER=./uploads
+```
+
+#### How To Test
+
+Run a syntax check:
+
+```bash
+python -m compileall app
+```
+
+Run the full system:
+
+```bash
+docker compose up -d --build
+```
+
+Check that the API can still reach Redis and Postgres:
+
+```bash
+curl http://localhost:5000/
+curl http://localhost:5000/files
+```
+
+Upload a file:
+
+```bash
+curl -X POST http://localhost:5000/upload -F "file=@sample.txt"
+```
+
+#### Concept Learned
+
+Configuration should live outside the code.
+
+Hardcoding values like database URLs, Redis URLs, and filesystem paths makes deployment harder because every environment may need different values. A config module plus `.env` keeps code stable while allowing local, Docker, VM, and production environments to provide different settings.

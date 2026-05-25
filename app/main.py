@@ -1,10 +1,10 @@
 from flask import Flask
 from .extensions import db
-import os # For reading Environment variables (env)
 
 from sqlalchemy.exc import OperationalError
 import time
 
+from app.config import DATABASE_URL
 from app.utils.logger import setup_logger
 
 def create_app(): # Instead creating globally, create inside function to avoid circular imports
@@ -13,10 +13,7 @@ def create_app(): # Instead creating globally, create inside function to avoid c
 
     setup_logger()
 
-    app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv(
-        "DATABASE_URL",
-        "postgresql://postgres:password@db:5432/tasks"
-    ) # If env exists, use it otherwise use default value
+    app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URL
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False # SQLAlchemy tracking (changes in memory)
 
     db.init_app(app)  # before this, Flask and DB exists but not connected

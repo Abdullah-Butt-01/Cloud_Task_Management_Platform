@@ -1,9 +1,10 @@
-import os
 from uuid import uuid4
+import os
 
 from flask import Blueprint, render_template, request
 from werkzeug.utils import secure_filename
 
+from app.config import UPLOAD_FOLDER
 from app.extensions import db, queue
 from app.jobs import process_text_file
 from app.models.file_job import FileJob
@@ -11,7 +12,6 @@ from app.utils.response import error_response, success_response
 
 file_bp = Blueprint("files", __name__)
 
-UPLOAD_FOLDER = os.getenv("UPLOAD_FOLDER", "uploads")
 ALLOWED_EXTENSION = ".txt"
 
 
