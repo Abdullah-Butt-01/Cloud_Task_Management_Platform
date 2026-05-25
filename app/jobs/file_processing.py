@@ -1,5 +1,6 @@
 from datetime import datetime
 import os
+import logging
 
 from app.extensions import db, queue
 from app.models.file_job import FileJob
@@ -57,6 +58,13 @@ def process_text_file(file_job_id):
         file_job.retry_count += 1
         file_job.error_message = str(error)
 
+        log_message(
+            "WORKER",
+            f"File processing failed error={error} attempt={file_job.retry_count}",
+            file_job_id=file_job.id,
+            level=logging.ERROR,
+        )
+
         if file_job.retry_count < MAX_RETRIES:
             file_job.status = "queued"
             db.session.commit()
@@ -69,6 +77,7 @@ def process_text_file(file_job_id):
                 "WORKER",
                 f"File processing retry queued: attempt={file_job.retry_count}",
                 file_job_id=file_job.id,
+                level=logging.WARNING,
             )
         else:
             file_job.status = "failed"
@@ -79,6 +88,7 @@ def process_text_file(file_job_id):
                 "WORKER",
                 f"File processing failed permanently: {error}",
                 file_job_id=file_job.id,
+                level=logging.ERROR,
             )
 
         return None

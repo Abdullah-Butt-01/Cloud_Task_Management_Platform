@@ -6,12 +6,13 @@ import redis
 import time
 import threading
 import socket
+from app.utils.logger import log_message
 
 r = redis.Redis(host="redis", port=6379, decode_responses=True)
 
 def send_heartbeat(worker_name):
     while True:
-      print(f"heartbeat from {worker_name}")
+      log_message("WORKER", f"Heartbeat from {worker_name}")
       r.set(f"worker:{worker_name}:heartbeat", time.time())
       time.sleep(5)
 
@@ -29,5 +30,6 @@ if __name__ == "__main__":
         )
         thread.start()
 
+        log_message("WORKER", f"Worker started name={worker_name}")
         worker = Worker([queue])
         worker.work()

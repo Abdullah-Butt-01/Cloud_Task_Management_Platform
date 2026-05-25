@@ -1,61 +1,49 @@
-from flask import Flask
-from .extensions import db
-
-from sqlalchemy.exc import OperationalError
 import time
 
-from app.config import DATABASE_URL
-from app.utils.logger import setup_logger
+from flask import Flask
+from sqlalchemy.exc import OperationalError
 
-def create_app(): # Instead creating globally, create inside function to avoid circular imports
+from app.config import DATABASE_URL
+from app.extensions import db
+from app.utils.logger import log_message, setup_logger
+
+
+def create_app():
     app = Flask(__name__)
-    print("create_app() is running")
 
     setup_logger()
+    log_message("API", "create_app() started")
 
     app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URL
-    app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False # SQLAlchemy tracking (changes in memory)
+    app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
-    db.init_app(app)  # before this, Flask and DB exists but not connected
+    db.init_app(app)
 
-    # import models AFTER db.init_app (database instance should exist first)
+    # Import models after db.init_app so SQLAlchemy knows every table.
     from app.models.file_job import FileJob
 
     from app.scheduler import start_scheduler
     start_scheduler(app)
 
-    # --- Wait for DB to be ready ---
-    for i in range(10):  # try 10 times
+    for _ in range(10):
         try:
             with app.app_context():
-                db.create_all()  # creates tables if not exist
-            print("✅ DB connected")
+                db.create_all()
+            log_message("API", "Database connected")
             break
         except OperationalError:
-            print("⏳ DB not ready, retrying in 2 seconds...")
+            log_message("API", "Database not ready, retrying in 2 seconds")
             time.sleep(2)
-    # -------------------------------
 
-
-    # import and register blueprints
     from app.routes.system_routes import system_bp
-    app.register_blueprint(system_bp) # add system routes to the application
+    app.register_blueprint(system_bp)
 
     from app.routes.file_routes import file_bp
     app.register_blueprint(file_bp)
 
-    ''' create tables (for development)
-    with app.app_context():
-        db.create_all()
-'''
     return app
+
 
 if __name__ == "__main__":
     app = create_app()
     app.run(host="0.0.0.0", port=5000, debug=True, use_reloader=False)
-
-
-
-
-
-

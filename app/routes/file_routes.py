@@ -1,5 +1,6 @@
 from uuid import uuid4
 import os
+import logging
 
 from flask import Blueprint, render_template, request
 from werkzeug.utils import secure_filename
@@ -8,6 +9,7 @@ from app.config import UPLOAD_FOLDER
 from app.extensions import db, queue
 from app.jobs import process_text_file
 from app.models.file_job import FileJob
+from app.utils.logger import log_message
 from app.utils.response import error_response, success_response
 
 file_bp = Blueprint("files", __name__)
@@ -22,14 +24,23 @@ def is_txt_file(filename):
 @file_bp.route("/upload", methods=["POST"])
 def upload_file():
     if "file" not in request.files:
+        log_message("API", "Upload failed: no file field", level=logging.WARNING)
         return error_response("No file uploaded", 400)
 
     file = request.files["file"]
 
+    log_message("API", f"Upload started filename={file.filename}")
+
     if file.filename == "":
+        log_message("API", "Upload failed: empty filename", level=logging.WARNING)
         return error_response("Empty filename", 400)
 
     if not is_txt_file(file.filename):
+        log_message(
+            "API",
+            f"Upload failed: unsupported file type filename={file.filename}",
+            level=logging.WARNING,
+        )
         return error_response("Only .txt files are allowed", 400)
 
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -52,6 +63,12 @@ def upload_file():
     rq_job = queue.enqueue(process_text_file, file_job.id)
     file_job.rq_job_id = rq_job.id
     db.session.commit()
+
+    log_message(
+        "API",
+        f"Job queued rq_job_id={rq_job.id} filename={original_filename}",
+        file_job_id=file_job.id,
+    )
 
     return success_response(
         {

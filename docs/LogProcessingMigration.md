@@ -244,3 +244,118 @@ curl -X POST http://localhost:5000/upload -F "file=@sample.txt"
 Configuration should live outside the code.
 
 Hardcoding values like database URLs, Redis URLs, and filesystem paths makes deployment harder because every environment may need different values. A config module plus `.env` keeps code stable while allowing local, Docker, VM, and production environments to provide different settings.
+
+### Step 3 - Add Proper Logging
+
+#### Goal
+
+Replace print-style debugging with Python logging and make the key runtime events visible.
+
+#### What Was Already Present
+
+- `app/utils/logger.py` already configured Python logging with `logging.basicConfig`.
+- `log_message()` already existed as a small helper for consistent log messages.
+- Worker processing already logged:
+  - file processing started
+  - file processing completed
+  - retry queued
+  - permanent failure
+- Scheduler already used Python logging.
+
+#### What Needed To Change
+
+- `print()` was still used in `app/main.py` for startup and database connection messages.
+- `print()` was still used in `app/worker.py` for heartbeat messages.
+- Upload flow did not log when an upload started.
+- Upload flow did not log when a background job was queued.
+- Upload validation failures were returned to the client but not logged.
+- All `log_message()` calls used info-level logging only, so failures could not be marked as warnings or errors.
+
+#### Changes Made
+
+- Updated `app/utils/logger.py`:
+  - formatted the helper cleanly
+  - added a `level` parameter
+  - kept existing `task_id`, `user_id`, and `file_job_id` support
+- Updated `app/routes/file_routes.py`:
+  - logs upload started
+  - logs job queued with RQ job ID and file job ID
+  - logs missing file upload as warning
+  - logs empty filename as warning
+  - logs unsupported file type as warning
+- Rewrote `app/main.py` startup messages to use `log_message()` instead of `print()`.
+- Updated `app/worker.py`:
+  - logs worker startup
+  - logs heartbeat through Python logging instead of `print()`
+- Updated `app/jobs/file_processing.py`:
+  - logs processing failures as `ERROR`
+  - logs retry queueing as `WARNING`
+  - logs permanent failure as `ERROR`
+
+#### Files Changed
+
+- `app/utils/logger.py`
+- `app/routes/file_routes.py`
+- `app/jobs/file_processing.py`
+- `app/main.py`
+- `app/worker.py`
+- `docs/LogProcessingMigration.md`
+
+#### Events Now Logged
+
+- API app startup
+- Database connection success
+- Database retry attempts
+- Upload started
+- Upload validation failures
+- Background job queued
+- Worker startup
+- Worker heartbeat
+- Worker processing started
+- Worker processing completed
+- Worker processing failure
+- Retry queued
+- Permanent failure
+
+#### How To Test
+
+Run a syntax check:
+
+```bash
+python -m compileall app
+```
+
+Run the system:
+
+```bash
+docker compose up -d --build
+```
+
+Watch logs:
+
+```bash
+docker compose logs -f api
+docker compose logs -f worker
+```
+
+Upload a valid file:
+
+```bash
+curl -X POST http://localhost:5000/upload -F "file=@sample.txt"
+```
+
+Upload an invalid file:
+
+```bash
+curl -X POST http://localhost:5000/upload -F "file=@bad.csv"
+```
+
+#### Concept Learned
+
+Logging is not just printing text. Good application logging records important system events with severity levels:
+
+- `INFO` for normal events
+- `WARNING` for recoverable or invalid situations
+- `ERROR` for failed operations
+
+This makes the system easier to debug locally and easier to operate later as an observability-style log processing system.
