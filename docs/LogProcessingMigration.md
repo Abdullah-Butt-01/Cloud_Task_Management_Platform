@@ -359,3 +359,104 @@ Logging is not just printing text. Good application logging records important sy
 - `ERROR` for failed operations
 
 This makes the system easier to debug locally and easier to operate later as an observability-style log processing system.
+
+### Step 4 - Add Timestamps
+
+#### Goal
+
+Track the lifecycle of each background job.
+
+#### Requested Fields
+
+- `started_at`
+- `completed_at`
+
+#### What Was Already Present
+
+The requested database fields already existed in `app/models/file_job.py`:
+
+```python
+started_at = db.Column(db.DateTime, nullable=True)
+completed_at = db.Column(db.DateTime, nullable=True)
+```
+
+The API response already exposed both fields through `FileJob.to_dict()`.
+
+The worker already set `started_at` when processing began:
+
+```python
+file_job.started_at = datetime.utcnow()
+```
+
+The worker already set `completed_at` when processing completed successfully:
+
+```python
+file_job.completed_at = datetime.utcnow()
+```
+
+The worker and scheduler also already set `completed_at` for terminal failure states.
+
+#### What Needed To Change
+
+The timestamp fields existed, but the dashboard did not show them. That made the lifecycle harder to inspect during local testing and demos.
+
+#### Changes Made
+
+- Updated `app/templates/dashboard.html`.
+- Added `Started At` column.
+- Added `Completed At` column.
+
+#### Files Changed
+
+- `app/templates/dashboard.html`
+- `docs/LogProcessingMigration.md`
+
+#### How To Test
+
+Run a syntax check:
+
+```bash
+python -m compileall app
+```
+
+Run the system:
+
+```bash
+docker compose up -d --build
+```
+
+Upload a file:
+
+```bash
+curl -X POST http://localhost:5000/upload -F "file=@sample.txt"
+```
+
+Check the API result:
+
+```bash
+curl http://localhost:5000/files/1
+```
+
+Open the dashboard:
+
+```text
+http://localhost:5000/dashboard
+```
+
+Expected lifecycle:
+
+- `created_at` is set when the job row is created.
+- `started_at` is set when the worker starts processing.
+- `completed_at` is set when the job reaches a terminal state such as `completed` or `failed`.
+
+#### Concept Learned
+
+Timestamps turn a background job into an observable lifecycle.
+
+Without timestamps, a status only tells what state the job is in. With timestamps, we can answer better operational questions:
+
+- When was the job created?
+- When did processing actually start?
+- How long did it wait in the queue?
+- How long did processing take?
+- When did it finish or fail?
