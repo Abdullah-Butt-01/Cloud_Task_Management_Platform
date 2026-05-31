@@ -13,6 +13,7 @@ class FileJob(db.Model):
     word_count = db.Column(db.Integer, nullable=True)
     line_count = db.Column(db.Integer, nullable=True)
     character_count = db.Column(db.Integer, nullable=True)
+    processing_time = db.Column(db.Float, nullable=True)
 
     retry_count = db.Column(db.Integer, default=0)
     error_message = db.Column(db.Text, nullable=True)
@@ -36,6 +37,7 @@ class FileJob(db.Model):
             "word_count": self.word_count,
             "line_count": self.line_count,
             "character_count": self.character_count,
+            "processing_time": self.processing_time,
             "retry_count": self.retry_count,
             "error_message": self.error_message,
             "rq_job_id": self.rq_job_id,

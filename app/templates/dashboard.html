@@ -17,6 +17,7 @@
         <th>Lines</th>
         <th>Characters</th>
         <th>Retries</th>
+        <th>Processing Time</th>
         <th>Started At</th>
         <th>Completed At</th>
         <th>Error</th>
@@ -31,6 +32,7 @@
         <td>{{ file_job.line_count if file_job.line_count is not none else "" }}</td>
         <td>{{ file_job.character_count if file_job.character_count is not none else "" }}</td>
         <td>{{ file_job.retry_count }}</td>
+        <td>{{ file_job.processing_time if file_job.processing_time is not none else "" }}</td>
         <td>{{ file_job.started_at or "" }}</td>
         <td>{{ file_job.completed_at or "" }}</td>
         <td>{{ file_job.error_message or "" }}</td>

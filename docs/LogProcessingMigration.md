@@ -460,3 +460,99 @@ Without timestamps, a status only tells what state the job is in. With timestamp
 - How long did it wait in the queue?
 - How long did processing take?
 - When did it finish or fail?
+
+### Step 5 - Add Processing Duration
+
+#### Goal
+
+Measure worker performance by storing how long each job spent inside worker processing.
+
+#### Requested Field
+
+- `processing_time`
+
+#### What Was Already Present
+
+- `started_at` already existed.
+- `completed_at` already existed.
+- The worker already set both timestamps during the job lifecycle.
+- The dashboard already showed `Started At` and `Completed At` after Step 4.
+
+#### What Needed To Change
+
+The system could show when processing started and ended, but it did not store the calculated duration. Anyone reading the API or dashboard had to calculate the duration manually.
+
+#### Changes Made
+
+- Added `processing_time` to `FileJob`.
+- Added `processing_time` to `FileJob.to_dict()` so API responses include it.
+- Added duration calculation in the worker:
+  - successful completion
+  - permanent failure
+- Added duration calculation in the scheduler when stale jobs time out.
+- Added `Processing Time` column to the dashboard.
+- Updated worker completion logs to include processing time.
+
+#### Files Changed
+
+- `app/models/file_job.py`
+- `app/jobs/file_processing.py`
+- `app/utils/task_service.py`
+- `app/templates/dashboard.html`
+- `docs/LogProcessingMigration.md`
+
+#### How Processing Time Is Calculated
+
+```python
+processing_time = (completed_at - started_at).total_seconds()
+```
+
+The value is rounded to 3 decimal places and stored in seconds.
+
+This measures worker execution time, not queue wait time.
+
+#### How To Test
+
+Run a syntax check:
+
+```bash
+python -m compileall app
+```
+
+Run the system:
+
+```bash
+docker compose up -d --build
+```
+
+Upload a file:
+
+```bash
+curl -X POST http://localhost:5000/upload -F "file=@sample.txt"
+```
+
+Check the result:
+
+```bash
+curl http://localhost:5000/files/1
+```
+
+Expected response includes:
+
+```json
+"processing_time": 0.123
+```
+
+Open the dashboard:
+
+```text
+http://localhost:5000/dashboard
+```
+
+Expected dashboard includes a `Processing Time` column.
+
+#### Concept Learned
+
+Processing duration is a basic performance metric.
+
+Timestamps tell when lifecycle events happened. Duration turns those timestamps into a measurable performance signal. In an observability-style system, this is the beginning of metrics such as latency, throughput, slow jobs, and worker performance trends.

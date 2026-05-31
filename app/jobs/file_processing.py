@@ -9,6 +9,13 @@ from app.utils.logger import log_message
 MAX_RETRIES = 3
 
 
+def calculate_processing_time(started_at, completed_at):
+    if not started_at or not completed_at:
+        return None
+
+    return round((completed_at - started_at).total_seconds(), 3)
+
+
 def count_text_stats(content):
     return {
         "word_count": len(content.split()),
@@ -48,9 +55,17 @@ def process_text_file(file_job_id):
         file_job.character_count = stats["character_count"]
         file_job.status = "completed"
         file_job.completed_at = datetime.utcnow()
+        file_job.processing_time = calculate_processing_time(
+            file_job.started_at,
+            file_job.completed_at,
+        )
         db.session.commit()
 
-        log_message("WORKER", "File processing completed", file_job_id=file_job.id)
+        log_message(
+            "WORKER",
+            f"File processing completed processing_time={file_job.processing_time}s",
+            file_job_id=file_job.id,
+        )
 
         return file_job.to_dict()
 
@@ -82,6 +97,10 @@ def process_text_file(file_job_id):
         else:
             file_job.status = "failed"
             file_job.completed_at = datetime.utcnow()
+            file_job.processing_time = calculate_processing_time(
+                file_job.started_at,
+                file_job.completed_at,
+            )
             db.session.commit()
 
             log_message(
