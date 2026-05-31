@@ -16,7 +16,7 @@ def send_heartbeat(worker_name):
       r.set(f"worker:{worker_name}:heartbeat", time.time())
       time.sleep(5)
 
-app = create_app()
+app = create_app(init_db=False, start_background_scheduler=False)
 
 if __name__ == "__main__":
     with app.app_context():

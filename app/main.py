@@ -8,7 +8,7 @@ from app.extensions import db
 from app.utils.logger import log_message, setup_logger
 
 
-def create_app():
+def create_app(init_db=True, start_background_scheduler=True):
     app = Flask(__name__)
 
     setup_logger()
@@ -22,18 +22,20 @@ def create_app():
     # Import models after db.init_app so SQLAlchemy knows every table.
     from app.models.file_job import FileJob
 
-    from app.scheduler import start_scheduler
-    start_scheduler(app)
+    if start_background_scheduler:
+        from app.scheduler import start_scheduler
+        start_scheduler(app)
 
-    for _ in range(10):
-        try:
-            with app.app_context():
-                db.create_all()
-            log_message("API", "Database connected")
-            break
-        except OperationalError:
-            log_message("API", "Database not ready, retrying in 2 seconds")
-            time.sleep(2)
+    if init_db:
+        for _ in range(10):
+            try:
+                with app.app_context():
+                    db.create_all()
+                log_message("API", "Database connected")
+                break
+            except OperationalError:
+                log_message("API", "Database not ready, retrying in 2 seconds")
+                time.sleep(2)
 
     from app.routes.system_routes import system_bp
     app.register_blueprint(system_bp)
