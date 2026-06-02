@@ -556,3 +556,96 @@ Expected dashboard includes a `Processing Time` column.
 Processing duration is a basic performance metric.
 
 Timestamps tell when lifecycle events happened. Duration turns those timestamps into a measurable performance signal. In an observability-style system, this is the beginning of metrics such as latency, throughput, slow jobs, and worker performance trends.
+
+## Stage 2 - Real Log Processing
+
+At this stage, the system identity changes from generic text-file processing toward real log processing.
+
+### Step 6 - Add Sample Nginx Log Support
+
+#### Goal
+
+Upload real logs into the system.
+
+#### What Was Already Present
+
+- The upload route already accepted text-like files.
+- Uploaded files were already saved to the configured upload folder.
+- A `FileJob` row was already created for every upload.
+- Redis Queue already handled background processing.
+- The worker already processed uploaded file contents asynchronously.
+
+#### What Needed To Change
+
+- The system only accepted `.txt` files.
+- There was no committed real-world log sample for testing or demos.
+- The root API response still identified the app as a TXT file processing API.
+
+#### Changes Made
+
+- Added a committed sample nginx access log:
+  - `samples/nginx_access.log`
+- Updated upload validation to accept:
+  - `.txt`
+  - `.log`
+- Updated unsupported upload error message to mention `.txt` and `.log`.
+- Updated the root route message to identify the service as a Log Processing API.
+
+#### Files Changed
+
+- `samples/nginx_access.log`
+- `app/routes/file_routes.py`
+- `app/routes/system_routes.py`
+- `docs/LogProcessingMigration.md`
+
+#### Sample Log Details
+
+The sample nginx log includes realistic access-log lines with several HTTP outcomes:
+
+- `200` successful requests
+- `302` redirect
+- `401` unauthorized
+- `403` forbidden
+- `404` not found
+- `500` server error
+- `504` gateway timeout
+
+This gives the next steps useful data for observability insights.
+
+#### How To Test
+
+Run a syntax check:
+
+```bash
+python -m compileall app
+```
+
+Run the system:
+
+```bash
+docker compose up -d --build
+```
+
+Check system identity:
+
+```bash
+curl http://localhost:5000/
+```
+
+Upload the sample nginx log:
+
+```bash
+curl -X POST http://localhost:5000/upload -F "file=@samples/nginx_access.log"
+```
+
+Check the job:
+
+```bash
+curl http://localhost:5000/files
+```
+
+#### Concept Learned
+
+Representative sample data makes a system easier to evolve.
+
+Before adding parsing logic, the project needs a stable real log file that can be used repeatedly for testing. This keeps future parser and insight changes grounded in realistic input instead of imaginary strings.

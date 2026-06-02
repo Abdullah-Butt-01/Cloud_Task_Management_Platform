@@ -7,6 +7,7 @@ from app.models.file_job import FileJob
 from app.utils.logger import log_message
 
 MAX_RETRIES = 3
+SUPPORTED_EXTENSIONS = {".txt", ".log"}
 
 
 def calculate_processing_time(started_at, completed_at):
@@ -42,8 +43,10 @@ def process_text_file(file_job_id):
         if not os.path.exists(file_job.file_path):
             raise FileNotFoundError("Uploaded file was not found")
 
-        if not file_job.original_filename.lower().endswith(".txt"):
-            raise ValueError("Only .txt files can be processed")
+        file_extension = os.path.splitext(file_job.original_filename)[1].lower()
+
+        if file_extension not in SUPPORTED_EXTENSIONS:
+            raise ValueError("Only .txt and .log files can be processed")
 
         with open(file_job.file_path, "r", encoding="utf-8") as text_file:
             content = text_file.read()

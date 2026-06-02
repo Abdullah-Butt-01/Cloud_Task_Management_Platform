@@ -14,11 +14,11 @@ from app.utils.response import error_response, success_response
 
 file_bp = Blueprint("files", __name__)
 
-ALLOWED_EXTENSION = ".txt"
+ALLOWED_EXTENSIONS = {".txt", ".log"}
 
 
-def is_txt_file(filename):
-    return os.path.splitext(filename)[1].lower() == ALLOWED_EXTENSION
+def is_supported_file(filename):
+    return os.path.splitext(filename)[1].lower() in ALLOWED_EXTENSIONS
 
 
 @file_bp.route("/upload", methods=["POST"])
@@ -35,13 +35,13 @@ def upload_file():
         log_message("API", "Upload failed: empty filename", level=logging.WARNING)
         return error_response("Empty filename", 400)
 
-    if not is_txt_file(file.filename):
+    if not is_supported_file(file.filename):
         log_message(
             "API",
             f"Upload failed: unsupported file type filename={file.filename}",
             level=logging.WARNING,
         )
-        return error_response("Only .txt files are allowed", 400)
+        return error_response("Only .txt and .log files are allowed", 400)
 
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 

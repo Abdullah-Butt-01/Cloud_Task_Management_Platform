@@ -15,7 +15,7 @@ r = Redis(host="redis", port=6379, decode_responses=True)
 def home():
     count = redis_conn.incr("hits")
     return {
-        "message": "TXT File Processing API running",
+        "message": "Log Processing API running",
         "visit": count,
         "upload_endpoint": "POST /upload",
         "files_endpoint": "GET /files",
