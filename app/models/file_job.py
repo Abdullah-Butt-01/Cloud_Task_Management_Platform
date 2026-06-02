@@ -17,6 +17,9 @@ class FileJob(db.Model):
     status_200_count = db.Column(db.Integer, default=0)
     status_404_count = db.Column(db.Integer, default=0)
     status_500_count = db.Column(db.Integer, default=0)
+    total_error_count = db.Column(db.Integer, default=0)
+    client_error_count = db.Column(db.Integer, default=0)
+    server_error_count = db.Column(db.Integer, default=0)
 
     retry_count = db.Column(db.Integer, default=0)
     error_message = db.Column(db.Text, nullable=True)
@@ -44,6 +47,9 @@ class FileJob(db.Model):
             "status_200_count": self.status_200_count,
             "status_404_count": self.status_404_count,
             "status_500_count": self.status_500_count,
+            "total_error_count": self.total_error_count,
+            "client_error_count": self.client_error_count,
+            "server_error_count": self.server_error_count,
             "retry_count": self.retry_count,
             "error_message": self.error_message,
             "rq_job_id": self.rq_job_id,

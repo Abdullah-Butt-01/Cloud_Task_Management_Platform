@@ -759,3 +759,124 @@ Expected response includes:
 Parsing turns raw logs into structured signals.
 
 Before this step, the worker only produced generic text statistics. Now it extracts operational meaning from the log format. This is the beginning of observability: turning raw events into queryable metrics.
+
+### Step 8 - Count Errors
+
+#### Goal
+
+Calculate error totals from parsed HTTP status codes.
+
+#### Requested Metrics
+
+- Total errors
+- 4xx errors
+- 5xx errors
+
+#### Step Separation
+
+Steps 8, 9, and 10 are separate steps:
+
+- Step 8 counts error categories.
+- Step 9 extracts unique client IP addresses.
+- Step 10 extracts and ranks requested endpoints.
+
+They should be implemented separately because each one teaches a different observability concept.
+
+#### What Was Already Present
+
+- Step 7 already parsed HTTP status codes from nginx access logs.
+- The worker already counted specific status codes:
+  - `200`
+  - `404`
+  - `500`
+- `FileJob` already stored parsed status-code metrics.
+- The dashboard already displayed status-code counts.
+
+#### What Needed To Change
+
+The system could count specific codes, but it did not summarize error categories. Observability systems usually group status codes because categories are easier to reason about:
+
+- `4xx` means client-side or request problems.
+- `5xx` means server-side or upstream problems.
+
+#### Changes Made
+
+- Added error fields to `FileJob`:
+  - `total_error_count`
+  - `client_error_count`
+  - `server_error_count`
+- Added those fields to `FileJob.to_dict()`.
+- Updated the worker parser to count:
+  - all `400-499` responses as client errors
+  - all `500-599` responses as server errors
+  - both categories together as total errors
+- Added dashboard columns:
+  - `Total Errors`
+  - `4xx`
+  - `5xx`
+
+#### Files Changed
+
+- `app/models/file_job.py`
+- `app/jobs/file_processing.py`
+- `app/templates/dashboard.html`
+- `docs/LogProcessingMigration.md`
+
+#### Expected Counts For Sample Log
+
+Using `samples/nginx_access.log`, expected values are:
+
+```text
+total errors: 5
+4xx: 3
+5xx: 2
+```
+
+The sample has:
+
+- `401`
+- `403`
+- `404`
+- `500`
+- `504`
+
+#### How To Test
+
+Run a syntax check:
+
+```bash
+python -m compileall app
+```
+
+Because this step adds database columns, reset the local dev database volume if you are not using migrations:
+
+```bash
+docker compose down -v
+docker compose up -d --build
+```
+
+Upload the sample nginx log:
+
+```bash
+curl -X POST http://localhost:5000/upload -F "file=@samples/nginx_access.log"
+```
+
+Check the result:
+
+```bash
+curl http://localhost:5000/files/1
+```
+
+Expected response includes:
+
+```json
+"total_error_count": 5,
+"client_error_count": 3,
+"server_error_count": 2
+```
+
+#### Concept Learned
+
+Error categories are higher-level signals than individual status codes.
+
+Specific codes are useful for detail, but categories make operational health easier to understand quickly. A rising `5xx` count usually means the system or upstream service is unhealthy, while a rising `4xx` count often points to invalid requests, authentication problems, missing resources, or client misuse.

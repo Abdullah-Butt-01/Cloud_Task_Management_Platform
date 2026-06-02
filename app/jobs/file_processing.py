@@ -32,6 +32,9 @@ def count_nginx_status_codes(content):
         "status_200_count": 0,
         "status_404_count": 0,
         "status_500_count": 0,
+        "total_error_count": 0,
+        "client_error_count": 0,
+        "server_error_count": 0,
     }
 
     for line in content.splitlines():
@@ -41,6 +44,7 @@ def count_nginx_status_codes(content):
             continue
 
         status_code = match.group("status_code")
+        status_number = int(status_code)
 
         if status_code == "200":
             counts["status_200_count"] += 1
@@ -48,6 +52,13 @@ def count_nginx_status_codes(content):
             counts["status_404_count"] += 1
         elif status_code == "500":
             counts["status_500_count"] += 1
+
+        if 400 <= status_number <= 499:
+            counts["client_error_count"] += 1
+            counts["total_error_count"] += 1
+        elif 500 <= status_number <= 599:
+            counts["server_error_count"] += 1
+            counts["total_error_count"] += 1
 
     return counts
 
@@ -87,6 +98,9 @@ def process_text_file(file_job_id):
         file_job.status_200_count = status_counts["status_200_count"]
         file_job.status_404_count = status_counts["status_404_count"]
         file_job.status_500_count = status_counts["status_500_count"]
+        file_job.total_error_count = status_counts["total_error_count"]
+        file_job.client_error_count = status_counts["client_error_count"]
+        file_job.server_error_count = status_counts["server_error_count"]
         file_job.status = "completed"
         file_job.completed_at = datetime.utcnow()
         file_job.processing_time = calculate_processing_time(
