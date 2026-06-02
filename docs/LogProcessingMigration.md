@@ -649,3 +649,113 @@ curl http://localhost:5000/files
 Representative sample data makes a system easier to evolve.
 
 Before adding parsing logic, the project needs a stable real log file that can be used repeatedly for testing. This keeps future parser and insight changes grounded in realistic input instead of imaginary strings.
+
+### Step 7 - Parse Status Codes
+
+#### Goal
+
+Extract HTTP status code counts from nginx access logs.
+
+#### Requested Status Codes
+
+- `200`
+- `404`
+- `500`
+
+#### What Was Already Present
+
+- The worker already opened and read uploaded file content.
+- The sample nginx log already contained `200`, `404`, and `500` responses.
+- The system already stored job results in `FileJob`.
+- The dashboard already displayed processing results.
+
+#### What Needed To Change
+
+The system processed logs as plain text only. It did not understand nginx access log structure, so it could not extract HTTP status codes.
+
+#### Changes Made
+
+- Added status-code fields to `FileJob`:
+  - `status_200_count`
+  - `status_404_count`
+  - `status_500_count`
+- Added those fields to `FileJob.to_dict()` so API responses include them.
+- Added nginx status-code parsing in the worker.
+- Added dashboard columns for:
+  - `200`
+  - `404`
+  - `500`
+
+#### Files Changed
+
+- `app/models/file_job.py`
+- `app/jobs/file_processing.py`
+- `app/templates/dashboard.html`
+- `docs/LogProcessingMigration.md`
+
+#### Parser Rule
+
+Nginx access logs commonly place the status code immediately after the quoted request:
+
+```text
+"GET /api/orders HTTP/1.1" 500 128
+```
+
+The worker uses this pattern:
+
+```python
+r'"\s(?P<status_code>\d{3})\s'
+```
+
+For this step, the parser only counts `200`, `404`, and `500`.
+
+#### Expected Counts For Sample Log
+
+Using `samples/nginx_access.log`, expected values are:
+
+```text
+200: 4
+404: 1
+500: 1
+```
+
+#### How To Test
+
+Run a syntax check:
+
+```bash
+python -m compileall app
+```
+
+Because this step adds database columns, reset the local dev database volume if you are not using migrations:
+
+```bash
+docker compose down -v
+docker compose up -d --build
+```
+
+Upload the sample nginx log:
+
+```bash
+curl -X POST http://localhost:5000/upload -F "file=@samples/nginx_access.log"
+```
+
+Check the result:
+
+```bash
+curl http://localhost:5000/files/1
+```
+
+Expected response includes:
+
+```json
+"status_200_count": 4,
+"status_404_count": 1,
+"status_500_count": 1
+```
+
+#### Concept Learned
+
+Parsing turns raw logs into structured signals.
+
+Before this step, the worker only produced generic text statistics. Now it extracts operational meaning from the log format. This is the beginning of observability: turning raw events into queryable metrics.

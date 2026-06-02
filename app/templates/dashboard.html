@@ -16,6 +16,9 @@
         <th>Words</th>
         <th>Lines</th>
         <th>Characters</th>
+        <th>200</th>
+        <th>404</th>
+        <th>500</th>
         <th>Retries</th>
         <th>Processing Time</th>
         <th>Started At</th>
@@ -31,6 +34,9 @@
         <td>{{ file_job.word_count if file_job.word_count is not none else "" }}</td>
         <td>{{ file_job.line_count if file_job.line_count is not none else "" }}</td>
         <td>{{ file_job.character_count if file_job.character_count is not none else "" }}</td>
+        <td>{{ file_job.status_200_count }}</td>
+        <td>{{ file_job.status_404_count }}</td>
+        <td>{{ file_job.status_500_count }}</td>
         <td>{{ file_job.retry_count }}</td>
         <td>{{ file_job.processing_time if file_job.processing_time is not none else "" }}</td>
         <td>{{ file_job.started_at or "" }}</td>

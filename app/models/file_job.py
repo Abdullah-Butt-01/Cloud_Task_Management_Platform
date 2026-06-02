@@ -14,6 +14,9 @@ class FileJob(db.Model):
     line_count = db.Column(db.Integer, nullable=True)
     character_count = db.Column(db.Integer, nullable=True)
     processing_time = db.Column(db.Float, nullable=True)
+    status_200_count = db.Column(db.Integer, default=0)
+    status_404_count = db.Column(db.Integer, default=0)
+    status_500_count = db.Column(db.Integer, default=0)
 
     retry_count = db.Column(db.Integer, default=0)
     error_message = db.Column(db.Text, nullable=True)
@@ -38,6 +41,9 @@ class FileJob(db.Model):
             "line_count": self.line_count,
             "character_count": self.character_count,
             "processing_time": self.processing_time,
+            "status_200_count": self.status_200_count,
+            "status_404_count": self.status_404_count,
+            "status_500_count": self.status_500_count,
             "retry_count": self.retry_count,
             "error_message": self.error_message,
             "rq_job_id": self.rq_job_id,

@@ -1,6 +1,7 @@
 from datetime import datetime
 import os
 import logging
+import re
 
 from app.extensions import db, queue
 from app.models.file_job import FileJob
@@ -8,6 +9,7 @@ from app.utils.logger import log_message
 
 MAX_RETRIES = 3
 SUPPORTED_EXTENSIONS = {".txt", ".log"}
+NGINX_STATUS_PATTERN = re.compile(r'"\s(?P<status_code>\d{3})\s')
 
 
 def calculate_processing_time(started_at, completed_at):
@@ -23,6 +25,31 @@ def count_text_stats(content):
         "line_count": len(content.splitlines()),
         "character_count": len(content),
     }
+
+
+def count_nginx_status_codes(content):
+    counts = {
+        "status_200_count": 0,
+        "status_404_count": 0,
+        "status_500_count": 0,
+    }
+
+    for line in content.splitlines():
+        match = NGINX_STATUS_PATTERN.search(line)
+
+        if not match:
+            continue
+
+        status_code = match.group("status_code")
+
+        if status_code == "200":
+            counts["status_200_count"] += 1
+        elif status_code == "404":
+            counts["status_404_count"] += 1
+        elif status_code == "500":
+            counts["status_500_count"] += 1
+
+    return counts
 
 
 def process_text_file(file_job_id):
@@ -52,10 +79,14 @@ def process_text_file(file_job_id):
             content = text_file.read()
 
         stats = count_text_stats(content)
+        status_counts = count_nginx_status_codes(content)
 
         file_job.word_count = stats["word_count"]
         file_job.line_count = stats["line_count"]
         file_job.character_count = stats["character_count"]
+        file_job.status_200_count = status_counts["status_200_count"]
+        file_job.status_404_count = status_counts["status_404_count"]
+        file_job.status_500_count = status_counts["status_500_count"]
         file_job.status = "completed"
         file_job.completed_at = datetime.utcnow()
         file_job.processing_time = calculate_processing_time(
