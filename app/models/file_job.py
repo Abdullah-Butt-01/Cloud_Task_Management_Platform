@@ -1,3 +1,4 @@
+
 from datetime import datetime
 
 from ..extensions import db
@@ -20,6 +21,12 @@ class FileJob(db.Model):
     total_error_count = db.Column(db.Integer, default=0)
     client_error_count = db.Column(db.Integer, default=0)
     server_error_count = db.Column(db.Integer, default=0)
+    unique_client_count = db.Column(db.Integer, default=0)
+    unique_client_ips = db.Column(db.Text, nullable=True)
+
+    # Step 10: Endpoint ranking fields
+    top_endpoints = db.Column(db.Text, nullable=True)
+    total_endpoints = db.Column(db.Integer, default=0)
 
     retry_count = db.Column(db.Integer, default=0)
     error_message = db.Column(db.Text, nullable=True)
@@ -50,6 +57,11 @@ class FileJob(db.Model):
             "total_error_count": self.total_error_count,
             "client_error_count": self.client_error_count,
             "server_error_count": self.server_error_count,
+            "unique_client_count": self.unique_client_count,
+            "unique_client_ips": self.unique_client_ips.split(",") if self.unique_client_ips else [],
+            # Step 10: Include endpoint ranking in API response
+            "top_endpoints": self._parse_top_endpoints(),
+            "total_endpoints": self.total_endpoints,
             "retry_count": self.retry_count,
             "error_message": self.error_message,
             "rq_job_id": self.rq_job_id,
@@ -58,3 +70,13 @@ class FileJob(db.Model):
             "completed_at": self.completed_at.isoformat() if self.completed_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
+
+    def _parse_top_endpoints(self):
+        """Parse the stored top_endpoints JSON string back into a list of dicts."""
+        if not self.top_endpoints:
+            return []
+        import json
+        try:
+            return json.loads(self.top_endpoints)
+        except json.JSONDecodeError:
+            return []

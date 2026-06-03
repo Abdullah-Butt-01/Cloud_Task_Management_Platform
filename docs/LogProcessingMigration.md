@@ -880,3 +880,254 @@ Expected response includes:
 Error categories are higher-level signals than individual status codes.
 
 Specific codes are useful for detail, but categories make operational health easier to understand quickly. A rising `5xx` count usually means the system or upstream service is unhealthy, while a rising `4xx` count often points to invalid requests, authentication problems, missing resources, or client misuse.
+
+### Step 9 - Extract Unique Client IPs
+
+#### Goal
+
+Identify all unique client IP addresses from nginx access logs and count how many distinct clients made requests.
+
+#### Requested Metrics
+
+- `unique_client_count` — total number of distinct IP addresses
+- `unique_client_ips` — comma-separated list of all unique IP addresses
+
+#### What Was Already Present
+
+- The worker already parsed nginx log lines for status codes.
+- The `NGINX_CLIENT_IP_PATTERN` regex already extracted the first token of each line as a client IP.
+- `FileJob` already had `unique_client_count` and `unique_client_ips` fields.
+- The dashboard already displayed a `Unique Clients` column.
+
+#### What Needed To Change
+
+The code already implemented the extraction logic but the migration document had not recorded it. This step completes the documentation gap.
+
+#### How Client IP Extraction Works
+
+Nginx access logs place the client IP as the first token of each line:
+
+```text
+192.168.1.10 - - [02/Jun/2026:08:15:01 +0000] "GET / HTTP/1.1" 200 612
+```
+
+The worker uses this pattern:
+
+```python
+NGINX_CLIENT_IP_PATTERN = re.compile(r"^(?P<client_ip>\S+)\s")
+```
+
+For each line, the worker:
+1. Extracts the IP address.
+2. Adds it to a `set()` to ensure uniqueness.
+3. Sorts the final list alphabetically.
+4. Stores the count and the comma-separated list.
+
+#### Expected Results For Sample Log
+
+Using `samples/nginx_access.log`, expected values are:
+
+```text
+unique_client_count: 10
+unique_client_ips: ["192.168.1.10", "192.168.1.11", "192.168.1.12", "192.168.1.13", "192.168.1.14", "192.168.1.15", "192.168.1.16", "192.168.1.17", "192.168.1.18", "192.168.1.19"]
+```
+
+#### Files Changed
+
+- `app/models/file_job.py` — fields already existed
+- `app/jobs/file_processing.py` — extraction logic already existed
+- `app/templates/dashboard.html` — column already existed
+- `docs/LogProcessingMigration.md` — this documentation added
+
+#### How To Test
+
+Run a syntax check:
+
+```bash
+python -m compileall app
+```
+
+Run the system:
+
+```bash
+docker compose down -v
+docker compose up -d --build
+```
+
+Upload the sample nginx log:
+
+```bash
+curl -X POST http://localhost:5000/upload -F "file=@samples/nginx_access.log"
+```
+
+Check the result:
+
+```bash
+curl http://localhost:5000/files/1
+```
+
+Expected response includes:
+
+```json
+"unique_client_count": 10,
+"unique_client_ips": ["192.168.1.10", "192.168.1.11", "192.168.1.12", "192.168.1.13", "192.168.1.14", "192.168.1.15", "192.168.1.16", "192.168.1.17", "192.168.1.18", "192.168.1.19"]
+```
+
+#### Concept Learned
+
+Unique client identification is a fundamental observability signal.
+
+Knowing how many distinct clients hit a service helps answer operational questions:
+- Is the traffic coming from many sources or one aggressive client?
+- Are there repeated failed requests from the same IP (potential attack or misconfigured client)?
+- Can we correlate errors with specific client patterns?
+
+This is the beginning of traffic-source analysis and security observability.
+
+
+
+
+### Step 10 - Extract and Rank Requested Endpoints
+
+#### Goal
+
+Parse HTTP method and endpoint (URI path) from each nginx log line, count how often each endpoint is requested, and surface the most frequently hit endpoints.
+
+#### Requested Metrics
+
+- `total_endpoints` — number of unique endpoint + method combinations found
+- `top_endpoints` — ranked list of the most frequently requested endpoints, including HTTP method, path, and hit count
+
+#### What Was Already Present
+
+- The worker already parsed nginx log lines for status codes and client IPs.
+- `FileJob` already stored status counts, error categories, and client IP data.
+- The dashboard already displayed all existing metrics in a tabular format.
+- The API already returned structured JSON for every job.
+
+#### What Needed To Change
+
+The system could count status codes and identify clients, but it could not answer the question: *Which endpoints are being hit the most?* This is a core observability signal for traffic analysis, capacity planning, and identifying hot paths or potential abuse.
+
+#### Changes Made
+
+- Added endpoint ranking fields to `FileJob`:
+  - `total_endpoints` — integer count of unique endpoints
+  - `top_endpoints` — JSON text storing the ranked list
+- Added endpoint extraction and ranking logic in the worker:
+  - New regex `NGINX_ENDPOINT_PATTERN` to extract `METHOD` and `/path` from the request line
+  - New `extract_and_rank_endpoints()` function that counts frequencies and returns top 5
+- Updated `FileJob.to_dict()` to parse `top_endpoints` JSON back into a list of dicts for the API
+- Added `total_endpoints` and `top_endpoints` to the API response
+- Updated the dashboard:
+  - Added `Total Endpoints` column
+  - Added `Top Endpoints` column showing method, path, and count for each top endpoint
+  - Added CSS styling for better readability
+- Updated worker completion log to include `total_endpoints`
+
+#### Parser Rule
+
+Nginx access logs place the request line inside double quotes:
+
+```text
+"GET /api/users HTTP/1.1"
+```
+
+The worker uses this pattern:
+
+```python
+NGINX_ENDPOINT_PATTERN = re.compile(r'"(?P<method>\S+)\s+(?P<endpoint>\S+)\s+HTTP')
+```
+
+For each line, the worker:
+1. Extracts the HTTP method (GET, POST, etc.) and the endpoint path.
+2. Creates a composite key `METHOD /path` so the same path with different methods counts separately.
+3. Counts occurrences in a dictionary.
+4. Sorts by count descending, then by endpoint name ascending.
+5. Returns the top 5 (configurable via `top_n` parameter).
+
+#### Expected Results For Sample Log
+
+Using `samples/nginx_access.log`, expected values are:
+
+```text
+total_endpoints: 10
+top_endpoints:
+  1. GET /                    (1)
+  2. GET /api/orders          (1)
+  3. GET /api/reports        (1)
+  4. GET /api/users          (1)
+  5. GET /checkout           (1)
+```
+
+All endpoints in the sample appear exactly once, so the ranking is alphabetical within the tied count.
+
+#### Files Changed
+
+- `app/models/file_job.py` — added `total_endpoints` and `top_endpoints` fields, added `_parse_top_endpoints()` helper
+- `app/jobs/file_processing.py` — added `NGINX_ENDPOINT_PATTERN`, `extract_and_rank_endpoints()`, integrated into `process_text_file()`
+- `app/templates/dashboard.html` — added `Total Endpoints` and `Top Endpoints` columns with CSS styling
+- `docs/LogProcessingMigration.md` — this documentation added
+
+#### How To Test
+
+Run a syntax check:
+
+```bash
+python -m compileall app
+```
+
+Because this step adds database columns, reset the local dev database volume if you are not using migrations:
+
+```bash
+docker compose down -v
+docker compose up -d --build
+```
+
+Upload the sample nginx log:
+
+```bash
+curl -X POST http://localhost:5000/upload -F "file=@samples/nginx_access.log"
+```
+
+Check the result:
+
+```bash
+curl http://localhost:5000/files/1
+```
+
+Expected response includes:
+
+```json
+"total_endpoints": 10,
+"top_endpoints": [
+  {"endpoint": "/", "method": "GET", "count": 1},
+  {"endpoint": "/api/orders", "method": "GET", "count": 1},
+  {"endpoint": "/api/reports", "method": "GET", "count": 1},
+  {"endpoint": "/api/users", "method": "GET", "count": 1},
+  {"endpoint": "/checkout", "method": "GET", "count": 1}
+]
+```
+
+Open the dashboard:
+
+```text
+http://localhost:5000/dashboard
+```
+
+Expected dashboard now shows:
+- A `Total Endpoints` column with the count
+- A `Top Endpoints` column listing each top endpoint as `METHOD /path (count)`
+
+#### Concept Learned
+
+Endpoint ranking transforms raw traffic into actionable routing intelligence.
+
+In observability systems, knowing which endpoints are most frequently hit helps answer critical operational questions:
+- Which API routes consume the most resources?
+- Are there unexpected spikes on specific endpoints (potential DDoS or scraping)?
+- Should we cache certain paths or scale specific services?
+- Are error-prone endpoints also the most trafficked ones?
+
+By storing both the total count and the ranked top list, the system provides both summary and detail — a pattern that scales from small dashboards to large analytics pipelines.
+

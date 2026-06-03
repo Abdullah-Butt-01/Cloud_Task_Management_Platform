@@ -3,25 +3,42 @@
 <head>
     <title>File Processing Dashboard</title>
     <meta http-equiv="refresh" content="5">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        h1 { color: #333; }
+        table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #4CAF50; color: white; }
+        tr:nth-child(even) { background-color: #f2f2f2; }
+        .status-completed { color: green; font-weight: bold; }
+        .status-failed { color: red; font-weight: bold; }
+        .status-processing { color: orange; font-weight: bold; }
+        .status-queued { color: blue; font-weight: bold; }
+        .endpoint-list { font-size: 0.85em; }
+        .endpoint-item { margin: 2px 0; }
+        .endpoint-count { color: #666; font-size: 0.9em; }
+    </style>
+<base target="_blank">
 </head>
 <body>
 
-<h1>File Processing Dashboard</h1>
+<h1>Log Processing Dashboard</h1>
 
-<table border="1">
+<table>
     <tr>
         <th>ID</th>
         <th>Filename</th>
         <th>Status</th>
-        <th>Words</th>
         <th>Lines</th>
-        <th>Characters</th>
         <th>200</th>
         <th>404</th>
         <th>500</th>
         <th>Total Errors</th>
         <th>4xx</th>
         <th>5xx</th>
+        <th>Unique Clients</th>
+        <th>Total Endpoints</th>
+        <th>Top Endpoints</th>
         <th>Retries</th>
         <th>Processing Time</th>
         <th>Started At</th>
@@ -33,16 +50,31 @@
     <tr>
         <td>{{ file_job.id }}</td>
         <td>{{ file_job.original_filename }}</td>
-        <td>{{ file_job.status }}</td>
-        <td>{{ file_job.word_count if file_job.word_count is not none else "" }}</td>
+        <td class="status-{{ file_job.status }}">{{ file_job.status }}</td>
         <td>{{ file_job.line_count if file_job.line_count is not none else "" }}</td>
-        <td>{{ file_job.character_count if file_job.character_count is not none else "" }}</td>
         <td>{{ file_job.status_200_count }}</td>
         <td>{{ file_job.status_404_count }}</td>
         <td>{{ file_job.status_500_count }}</td>
         <td>{{ file_job.total_error_count }}</td>
         <td>{{ file_job.client_error_count }}</td>
         <td>{{ file_job.server_error_count }}</td>
+        <td>{{ file_job.unique_client_count }}</td>
+        <td>{{ file_job.total_endpoints if file_job.total_endpoints is not none else "" }}</td>
+        <td>
+            {% if file_job.top_endpoints %}
+                <div class="endpoint-list">
+                {% set endpoints = file_job._parse_top_endpoints() %}
+                {% for ep in endpoints %}
+                    <div class="endpoint-item">
+                        <strong>{{ ep.method }}</strong> {{ ep.endpoint }}
+                        <span class="endpoint-count">({{ ep.count }})</span>
+                    </div>
+                {% endfor %}
+                </div>
+            {% else %}
+                -
+            {% endif %}
+        </td>
         <td>{{ file_job.retry_count }}</td>
         <td>{{ file_job.processing_time if file_job.processing_time is not none else "" }}</td>
         <td>{{ file_job.started_at or "" }}</td>
