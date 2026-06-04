@@ -6,14 +6,13 @@ import re
 
 from app.extensions import db, queue
 from app.models.file_job import FileJob
+from app.models.log_insight import LogInsight
 from app.utils.logger import log_message
 
 MAX_RETRIES = 3
 SUPPORTED_EXTENSIONS = {".txt", ".log"}
 NGINX_STATUS_PATTERN = re.compile(r'"\s(?P<status_code>\d{3})\s')
 NGINX_CLIENT_IP_PATTERN = re.compile(r"^(?P<client_ip>\S+)\s")
-# Step 10: New regex to extract HTTP method and endpoint from nginx log lines
-# Example: "GET /api/users HTTP/1.1" -> method=GET, endpoint=/api/users
 NGINX_ENDPOINT_PATTERN = re.compile(
     r'"(?P<method>\S+)\s+(?P<endpoint>\S+)\s+HTTP'
 )
@@ -22,7 +21,6 @@ NGINX_ENDPOINT_PATTERN = re.compile(
 def calculate_processing_time(started_at, completed_at):
     if not started_at or not completed_at:
         return None
-
     return round((completed_at - started_at).total_seconds(), 3)
 
 
@@ -35,10 +33,19 @@ def count_text_stats(content):
 
 
 def count_nginx_status_codes(content):
+    """
+    Count all HTTP status codes from nginx log content.
+    Step 11: Expanded to count all common status codes, not just 200/404/500.
+    """
     counts = {
         "status_200_count": 0,
         "status_404_count": 0,
         "status_500_count": 0,
+        "status_301_count": 0,
+        "status_302_count": 0,
+        "status_401_count": 0,
+        "status_403_count": 0,
+        "status_504_count": 0,
         "total_error_count": 0,
         "client_error_count": 0,
         "server_error_count": 0,
@@ -46,20 +53,31 @@ def count_nginx_status_codes(content):
 
     for line in content.splitlines():
         match = NGINX_STATUS_PATTERN.search(line)
-
         if not match:
             continue
 
         status_code = match.group("status_code")
         status_number = int(status_code)
 
+        # Count specific status codes
         if status_code == "200":
             counts["status_200_count"] += 1
+        elif status_code == "301":
+            counts["status_301_count"] += 1
+        elif status_code == "302":
+            counts["status_302_count"] += 1
+        elif status_code == "401":
+            counts["status_401_count"] += 1
+        elif status_code == "403":
+            counts["status_403_count"] += 1
         elif status_code == "404":
             counts["status_404_count"] += 1
         elif status_code == "500":
             counts["status_500_count"] += 1
+        elif status_code == "504":
+            counts["status_504_count"] += 1
 
+        # Categorize errors
         if 400 <= status_number <= 499:
             counts["client_error_count"] += 1
             counts["total_error_count"] += 1
@@ -72,57 +90,91 @@ def count_nginx_status_codes(content):
 
 def extract_unique_client_ips(content):
     client_ips = set()
-
     for line in content.splitlines():
         match = NGINX_CLIENT_IP_PATTERN.search(line)
-
         if match:
             client_ips.add(match.group("client_ip"))
-
     return sorted(client_ips)
 
 
-# Step 10: New function to extract and rank endpoints
 def extract_and_rank_endpoints(content, top_n=5):
-    """
-    Extract all HTTP endpoints from nginx log content and rank by frequency.
-
-    Returns:
-        dict with:
-        - total_endpoints: number of unique endpoints found
-        - top_endpoints: list of {endpoint, method, count} dicts, sorted by count desc
-    """
     endpoint_counts = {}
-
     for line in content.splitlines():
         match = NGINX_ENDPOINT_PATTERN.search(line)
-
         if not match:
             continue
-
         method = match.group("method")
         endpoint = match.group("endpoint")
-        # Create a composite key: "METHOD /path" so GET /api/users and POST /api/users are separate
         key = f"{method} {endpoint}"
-
         if key not in endpoint_counts:
             endpoint_counts[key] = {"endpoint": endpoint, "method": method, "count": 0}
-
         endpoint_counts[key]["count"] += 1
 
-    # Sort by count descending, then by endpoint name ascending
     sorted_endpoints = sorted(
         endpoint_counts.values(),
         key=lambda x: (-x["count"], x["endpoint"])
     )
-
-    # Take top N (default 5)
-    top_endpoints = sorted_endpoints[:top_n]
-
     return {
         "total_endpoints": len(endpoint_counts),
-        "top_endpoints": top_endpoints,
+        "top_endpoints": sorted_endpoints[:top_n],
     }
+
+
+# Step 11: New function to create or update LogInsight record
+def save_log_insight(file_job, status_counts, unique_client_ips, endpoint_data, line_count):
+    """
+    Create or update a LogInsight record linked to the given FileJob.
+
+    This separates computed insights from raw job metadata, enabling:
+    - Independent querying of insights across time
+    - Trend analysis and comparison between uploads
+    - Health scoring based on error rates
+    """
+    insight = LogInsight.query.filter_by(file_job_id=file_job.id).first()
+
+    if not insight:
+        insight = LogInsight(file_job_id=file_job.id)
+        db.session.add(insight)
+
+    # Traffic volume
+    insight.total_requests = status_counts["status_200_count"] + status_counts["status_301_count"] + status_counts["status_302_count"] + status_counts["status_401_count"] + status_counts["status_403_count"] + status_counts["status_404_count"] + status_counts["status_500_count"] + status_counts["status_504_count"]
+    insight.total_lines = line_count
+
+    # Status codes
+    insight.status_200_count = status_counts["status_200_count"]
+    insight.status_301_count = status_counts["status_301_count"]
+    insight.status_302_count = status_counts["status_302_count"]
+    insight.status_401_count = status_counts["status_401_count"]
+    insight.status_403_count = status_counts["status_403_count"]
+    insight.status_404_count = status_counts["status_404_count"]
+    insight.status_500_count = status_counts["status_500_count"]
+    insight.status_504_count = status_counts["status_504_count"]
+
+    # Errors
+    insight.total_error_count = status_counts["total_error_count"]
+    insight.client_error_count = status_counts["client_error_count"]
+    insight.server_error_count = status_counts["server_error_count"]
+
+    # Clients
+    insight.unique_client_count = len(unique_client_ips)
+    insight.unique_client_ips = ",".join(unique_client_ips)
+
+    # Endpoints
+    insight.total_endpoints = endpoint_data["total_endpoints"]
+    insight.top_endpoints = json.dumps(endpoint_data["top_endpoints"])
+
+    # Health score (calculated automatically)
+    insight.calculate_health_score()
+
+    db.session.commit()
+
+    log_message(
+        "WORKER",
+        f"LogInsight saved health_score={insight.health_score} status={insight.health_status}",
+        file_job_id=file_job.id,
+    )
+
+    return insight
 
 
 def process_text_file(file_job_id):
@@ -144,7 +196,6 @@ def process_text_file(file_job_id):
             raise FileNotFoundError("Uploaded file was not found")
 
         file_extension = os.path.splitext(file_job.original_filename)[1].lower()
-
         if file_extension not in SUPPORTED_EXTENSIONS:
             raise ValueError("Only .txt and .log files can be processed")
 
@@ -154,9 +205,9 @@ def process_text_file(file_job_id):
         stats = count_text_stats(content)
         status_counts = count_nginx_status_codes(content)
         unique_client_ips = extract_unique_client_ips(content)
-        # Step 10: Extract and rank endpoints
         endpoint_data = extract_and_rank_endpoints(content)
 
+        # Update FileJob (keep existing fields for backward compatibility)
         file_job.word_count = stats["word_count"]
         file_job.line_count = stats["line_count"]
         file_job.character_count = stats["character_count"]
@@ -168,7 +219,6 @@ def process_text_file(file_job_id):
         file_job.server_error_count = status_counts["server_error_count"]
         file_job.unique_client_count = len(unique_client_ips)
         file_job.unique_client_ips = ",".join(unique_client_ips)
-        # Step 10: Store endpoint ranking data
         file_job.total_endpoints = endpoint_data["total_endpoints"]
         file_job.top_endpoints = json.dumps(endpoint_data["top_endpoints"])
         file_job.status = "completed"
@@ -178,6 +228,15 @@ def process_text_file(file_job_id):
             file_job.completed_at,
         )
         db.session.commit()
+
+        # Step 11: Create LogInsight record with all computed insights
+        save_log_insight(
+            file_job=file_job,
+            status_counts=status_counts,
+            unique_client_ips=unique_client_ips,
+            endpoint_data=endpoint_data,
+            line_count=stats["line_count"],
+        )
 
         log_message(
             "WORKER",

@@ -1131,3 +1131,223 @@ In observability systems, knowing which endpoints are most frequently hit helps 
 
 By storing both the total count and the ranked top list, the system provides both summary and detail — a pattern that scales from small dashboards to large analytics pipelines.
 
+## Stage 3 — Insights Engine
+
+At this stage, the system transitions from a file processor into a monitoring system. The core change is separating computed insights from raw job metadata, enabling trend analysis, health scoring, and independent querying.
+
+---
+
+### Step 11 - Create LogInsight Model
+
+#### Goal
+
+Store computed analysis results in a separate table from raw job metadata. This decouples the processing pipeline from the observability layer, allowing insights to be queried, compared, and trended independently.
+
+#### Requested Metrics
+
+- `total_requests` — total HTTP requests counted
+- `total_lines` — total log lines processed
+- Expanded status code counts: `301`, `302`, `401`, `403`, `504` (in addition to existing `200`, `404`, `500`)
+- `health_score` — calculated value from 0.0 to 1.0 based on error rate
+- `health_status` — categorical label: `healthy`, `degraded`, `unhealthy`, or `unknown`
+
+#### What Was Already Present
+
+- `FileJob` already stored all computed metrics inline (status counts, errors, client IPs, endpoints).
+- The worker already parsed and counted these values during processing.
+- The dashboard already displayed all metrics from `FileJob`.
+- The API already returned structured JSON for every job.
+
+#### What Needed To Change
+
+The problem: **FileJob mixed two responsibilities**:
+1. **Job orchestration** — tracking upload, queue, processing, retry, and failure state
+2. **Observability data** — storing computed counts, rankings, and health signals
+
+This coupling made it impossible to:
+- Query insights across multiple uploads without dragging job metadata
+- Compare health trends between log files over time
+- Add new insight types without bloating the job table
+- Recompute or refresh insights without touching job state
+
+#### Changes Made
+
+**1. New Model: `app/models/log_insight.py`**
+
+Created a dedicated `LogInsight` model with:
+- Foreign key `file_job_id` linking back to `FileJob` (one-to-one relationship)
+- Traffic volume fields: `total_requests`, `total_lines`
+- Expanded status code counts: `200`, `301`, `302`, `401`, `403`, `404`, `500`, `504`
+- Error categorization: `total_error_count`, `client_error_count`, `server_error_count`
+- Client analysis: `unique_client_count`, `unique_client_ips`
+- Endpoint analysis: `total_endpoints`, `top_endpoints` (JSON)
+- Health summary: `health_score` (Float), `health_status` (String)
+- Metadata: `created_at`, `updated_at`
+
+Added methods:
+- `calculate_health_score()` — computes score from error rate, sets status label
+- `_parse_top_endpoints()` — deserializes stored JSON
+- `_parse_client_ips()` — splits comma-separated IPs
+- `to_dict()` — returns full insight as structured JSON
+
+**2. Updated Worker: `app/jobs/file_processing.py`**
+
+- Added `import LogInsight` from the new model
+- Expanded `count_nginx_status_codes()` to count all 8 status codes (not just 200/404/500)
+- Added new `save_log_insight()` function that:
+  - Looks up existing insight by `file_job_id` or creates one
+  - Populates all insight fields from computed data
+  - Calls `calculate_health_score()` to auto-compute health
+  - Commits and logs the result
+- Integrated `save_log_insight()` call into `process_text_file()` after FileJob is updated
+- Kept all existing FileJob fields for backward compatibility
+
+**3. Updated App Factory: `app/main.py`**
+
+- Added `from app.models.log_insight import LogInsight` import so SQLAlchemy registers the table during `db.create_all()`
+
+**4. Database Relationship**
+
+```python
+# LogInsight -> FileJob (one-to-one)
+file_job_id = db.Column(db.Integer, db.ForeignKey('file_job.id'), nullable=False, unique=True)
+file_job = db.relationship('FileJob', backref=db.backref('insight', uselist=False))
+```
+
+This means:
+- Every `FileJob` can have zero or one `LogInsight`
+- Access via `file_job.insight` returns the insight object
+- Access via `insight.file_job` returns the source job
+
+#### Health Score Calculation
+
+```python
+def calculate_health_score(self):
+    if not self.total_requests or self.total_requests == 0:
+        self.health_score = None
+        self.health_status = "unknown"
+        return
+
+    error_rate = self.total_error_count / self.total_requests
+    self.health_score = round(max(0.0, 1.0 - error_rate), 3)
+
+    if self.health_score >= 0.95:
+        self.health_status = "healthy"
+    elif self.health_score >= 0.80:
+        self.health_status = "degraded"
+    else:
+        self.health_status = "unhealthy"
+```
+
+**Scoring thresholds:**
+- `≥ 0.95` → `healthy` (≤ 5% errors)
+- `≥ 0.80` → `degraded` (5–20% errors)
+- `< 0.80` → `unhealthy` (> 20% errors)
+- No requests → `unknown`
+
+#### Expected Results For Sample Log
+
+Using `samples/nginx_access.log` (10 lines):
+
+```text
+total_requests:        10
+total_lines:           10
+status_200_count:      4
+status_301_count:      0
+status_302_count:      1
+status_401_count:      1
+status_403_count:      1
+status_404_count:      1
+status_500_count:      1
+status_504_count:      1
+total_error_count:     5
+client_error_count:    3
+server_error_count:    2
+unique_client_count:   10
+total_endpoints:       10
+health_score:          0.5
+health_status:         unhealthy
+```
+
+With 5 errors out of 10 requests, the health score is `0.5` and status is `unhealthy`.
+
+#### Files Changed
+
+- `app/models/log_insight.py` — **new file**, the LogInsight model
+- `app/jobs/file_processing.py` — added `save_log_insight()`, expanded status code counting, imported LogInsight
+- `app/main.py` — imported LogInsight for SQLAlchemy table registration
+- `docs/LogProcessingMigration.md` — this documentation added
+
+#### Files Unchanged (Backward Compatibility)
+
+- `app/models/file_job.py` — kept all existing fields; FileJob still stores its own copy of metrics
+- `app/templates/dashboard.html` — still reads from FileJob (insight data accessible via API expansion later)
+- `app/routes/file_routes.py` — no changes needed for this step
+
+#### How To Test
+
+Run a syntax check:
+
+```bash
+python -m compileall app
+```
+
+Reset the database (new table requires schema creation):
+
+```bash
+docker compose down -v
+docker compose up -d --build
+```
+
+Upload the sample nginx log:
+
+```bash
+curl -X POST http://localhost:5000/upload -F "file=@samples/nginx_access.log"
+```
+
+Check the FileJob result (backward compatible):
+
+```bash
+curl http://localhost:5000/files/1
+```
+
+Verify the LogInsight record was created by querying the database directly:
+
+```bash
+docker exec -it postgres-db psql -U postgres -d tasks -c "SELECT * FROM log_insight;"
+```
+
+Expected output:
+
+```
+ id | file_job_id | total_requests | total_lines | status_200_count | ... | health_score | health_status
+----+-------------+----------------+-------------+------------------+-----+--------------+---------------
+  1 |           1 |             10 |          10 |                4 | ... |          0.5 | unhealthy
+```
+
+Check the relationship from the job side:
+
+```bash
+docker exec -it postgres-db psql -U postgres -d tasks -c "SELECT f.id, f.status, i.health_score, i.health_status FROM file_job f LEFT JOIN log_insight i ON f.id = i.file_job_id;"
+```
+
+#### Concept Learned
+
+**Separate concerns between orchestration and analysis.**
+
+`FileJob` answers: *Did the processing succeed? When? How long did it take? How many retries?*
+
+`LogInsight` answers: *What did the log tell us? How healthy is the service? Which endpoints are hot? Are errors rising?*
+
+This separation is the foundation of a monitoring system:
+- **Job metadata** is ephemeral and operational (needed for the pipeline)
+- **Insight data** is analytical and persistent (needed for dashboards, alerts, and trend analysis)
+
+By storing insights in their own table, the system can now:
+- Run queries like `SELECT AVG(health_score) FROM log_insight WHERE created_at > NOW() - INTERVAL '7 days'`
+- Compare today's traffic patterns against last week's
+- Build alerting rules on health score thresholds
+- Export insight data to external analytics tools without job noise
+
+This is the architectural shift from **file processing** to **log observability**.
+

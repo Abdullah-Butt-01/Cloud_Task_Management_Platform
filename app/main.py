@@ -21,6 +21,7 @@ def create_app(init_db=True, start_background_scheduler=True):
 
     # Import models after db.init_app so SQLAlchemy knows every table.
     from app.models.file_job import FileJob
+    from app.models.log_insight import LogInsight  # Step 11: New model
 
     if start_background_scheduler:
         from app.scheduler import start_scheduler
