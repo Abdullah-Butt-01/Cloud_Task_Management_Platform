@@ -44,6 +44,9 @@ def create_app(init_db=True, start_background_scheduler=True):
     from app.routes.file_routes import file_bp
     app.register_blueprint(file_bp)
 
+    from app.routes.insight_routes import insight_bp
+    app.register_blueprint(insight_bp)
+
     return app
 
 
