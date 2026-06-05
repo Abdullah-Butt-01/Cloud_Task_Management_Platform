@@ -1351,3 +1351,199 @@ By storing insights in their own table, the system can now:
 
 This is the architectural shift from **file processing** to **log observability**.
 
+### Step 13 - Add Insights API
+
+#### Goal
+
+Expose stored analytics through dedicated REST endpoints so clients can query insights independently from job metadata.
+
+#### Requested Routes
+
+- `GET /insights` — list all insights with optional filtering
+- `GET /insights/<id>` — single insight by ID with linked file job summary
+- `GET /insights/health-summary` — aggregated health statistics across all uploads
+
+#### What Was Already Present
+
+- `LogInsight` model already stored all computed metrics in the database.
+- `save_log_insight()` already created records after file processing.
+- `FileJob` already had API routes (`/files`, `/files/<id>`) returning job metadata.
+- The existing response helper (`success_response`, `error_response`) provided consistent JSON formatting.
+
+#### What Needed To Change
+
+The insights existed in the database but were **inaccessible from the API**. Clients could only see raw job data through `/files/<id>`, which mixed orchestration metadata with analysis results. There was no way to:
+- Query only insights (without job noise)
+- Filter by health status
+- Get system-wide health aggregates
+- Retrieve a single insight with its source job context
+
+#### Changes Made
+
+**1. New Route File: `app/routes/insight_routes.py`**
+
+Created a dedicated blueprint with three endpoints:
+
+- **`GET /insights`** — lists all LogInsight records, supports:
+  - `?health_status=` filter (healthy, degraded, unhealthy, unknown)
+  - `?limit=` pagination (default 50)
+  - Ordered by `created_at` descending (newest first)
+
+- **`GET /insights/<id>`** — returns single insight including:
+  - Full insight data via `to_dict()`
+  - Linked file job summary (id, filename, status, processing time)
+  - 404 if insight not found
+
+- **`GET /insights/health-summary`** — aggregated statistics:
+  - Total insight count
+  - Breakdown by health status (healthy, degraded, unhealthy, unknown)
+  - Average health score across all insights
+  - Healthy percentage
+
+**2. Updated App Factory: `app/main.py`**
+
+Registered the new `insight_bp` blueprint alongside existing `system_bp` and `file_bp`.
+
+**3. Consistent Patterns**
+
+All routes follow the same patterns as existing routes:
+- Use `success_response()` / `error_response()` for consistent JSON structure
+- Use `log_message()` for API-level logging
+- Use SQLAlchemy query interface for database access
+
+#### Files Changed
+
+- `app/routes/insight_routes.py` — **new file**, insight API endpoints
+- `app/main.py` — registered `insight_bp` blueprint
+- `docs/LogProcessingMigration.md` — this documentation added
+
+#### Files Unchanged
+
+- `app/models/log_insight.py` — no model changes needed
+- `app/jobs/file_processing.py` — no worker changes needed
+- `app/routes/file_routes.py` — no file route changes needed
+
+#### API Response Examples
+
+**GET /insights**
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "insight_id": 1,
+      "file_job_id": 1,
+      "total_requests": 10,
+      "total_lines": 10,
+      "status_200_count": 4,
+      "status_404_count": 1,
+      "status_500_count": 1,
+      "total_error_count": 5,
+      "client_error_count": 3,
+      "server_error_count": 2,
+      "unique_client_count": 10,
+      "total_endpoints": 10,
+      "health_score": 0.5,
+      "health_status": "unhealthy",
+      "created_at": "2026-06-05T12:00:00",
+      "updated_at": "2026-06-05T12:00:00"
+    }
+  ],
+  "error": null
+}
+```
+
+**GET /insights/1**
+
+```json
+{
+  "success": true,
+  "data": {
+    "insight_id": 1,
+    "file_job_id": 1,
+    "total_requests": 10,
+    ...,
+    "health_score": 0.5,
+    "health_status": "unhealthy",
+    "file_job": {
+      "id": 1,
+      "original_filename": "nginx_access.log",
+      "status": "completed",
+      "processing_time": 0.123,
+      "created_at": "2026-06-05T12:00:00"
+    }
+  },
+  "error": null
+}
+```
+
+**GET /insights/health-summary**
+
+```json
+{
+  "success": true,
+  "data": {
+    "total_insights": 5,
+    "breakdown": {
+      "healthy": 2,
+      "degraded": 1,
+      "unhealthy": 1,
+      "unknown": 1
+    },
+    "average_health_score": 0.73,
+    "healthy_percentage": 40.0
+  },
+  "error": null
+}
+```
+
+#### How To Test
+
+Run a syntax check:
+
+```bash
+python -m compileall app
+```
+
+Run the system:
+
+```bash
+docker compose down -v
+docker compose up -d --build
+```
+
+Upload a log file first (to create an insight):
+
+```bash
+curl -X POST http://localhost:5000/upload -F "file=@samples/nginx_access.log"
+```
+
+Test the new endpoints:
+
+```bash
+# List all insights
+curl http://localhost:5000/insights
+
+# Filter by health status
+curl "http://localhost:5000/insights?health_status=unhealthy"
+
+# Get single insight
+curl http://localhost:5000/insights/1
+
+# Get health summary
+curl http://localhost:5000/insights/health-summary
+```
+
+#### Concept Learned
+
+**Expose analytics through dedicated endpoints, not just embedded in job responses.**
+
+Before this step, insights were only accessible as nested data inside FileJob responses. Now they are first-class resources with their own query interface. This enables:
+
+- **Independent querying** — dashboards can poll `/insights` without pulling job metadata
+- **Filtering** — operations teams can focus on `unhealthy` insights only
+- **Aggregation** — `/health-summary` provides executive-level health dashboards
+- **Scalability** — as insight types grow, the `/insights` namespace can expand without affecting job routes
+
+This is the pattern that separates **data pipelines** (FileJob) from **analytics platforms** (LogInsight API).  
