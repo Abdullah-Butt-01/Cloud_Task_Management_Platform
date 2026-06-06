@@ -47,6 +47,9 @@ def create_app(init_db=True, start_background_scheduler=True):
     from app.routes.insight_routes import insight_bp
     app.register_blueprint(insight_bp)
 
+    from app.routes.metrics_routes import metrics_bp
+    app.register_blueprint(metrics_bp)
+
     return app
 
 

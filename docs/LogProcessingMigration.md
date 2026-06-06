@@ -1547,3 +1547,150 @@ Before this step, insights were only accessible as nested data inside FileJob re
 - **Scalability** — as insight types grow, the `/insights` namespace can expand without affecting job routes
 
 This is the pattern that separates **data pipelines** (FileJob) from **analytics platforms** (LogInsight API).  
+
+### Step 14 - Add Metrics Endpoint
+
+#### Goal
+
+Expose system-wide statistics about the entire processing pipeline through a single endpoint. This provides an operational dashboard view of the system's health, throughput, and performance.
+
+#### Requested Route
+
+- `GET /metrics` — system-wide statistics
+
+#### What Was Already Present
+
+- `FileJob` stored individual job status, processing time, retry counts, and error counts.
+- `LogInsight` stored health scores and status distributions.
+- The worker sent heartbeat keys to Redis.
+- The RQ queue exposed `queue.count` for pending jobs.
+- `/debug/workers` already checked worker heartbeats.
+- `/` already tracked API hits via Redis `incr("hits")`.
+
+#### What Needed To Change
+
+All these metrics existed in separate places (database, Redis, scattered endpoints). There was no single endpoint that aggregated them into an operational snapshot. An operator monitoring the system would need to call `/files`, `/insights/health-summary`, `/debug/workers`, and check Redis manually.
+
+#### Changes Made
+
+**1. New Route File: `app/routes/metrics_routes.py`**
+
+Created a dedicated `metrics_bp` blueprint with one endpoint:
+
+- **`GET /metrics`** — returns a structured snapshot with 5 metric categories:
+
+| Category | Metrics |
+|----------|---------|
+| `jobs` | total, queued, processing, completed, failed, success_rate %, avg_processing_time, total_retries |
+| `errors` | total_errors, client_errors, server_errors (summed across all jobs) |
+| `insights` | total_insights, healthy/degraded/unhealthy counts, average_health_score |
+| `queue` | pending_jobs (from RQ queue count) |
+| `workers` | total, alive, dead (from Redis heartbeat keys) |
+| `system` | api_hits (Redis counter) |
+
+All values are computed at request time using SQL `COUNT`, `SUM`, `AVG` queries and Redis lookups. No caching — this is a real-time operational endpoint.
+
+**2. Updated App Factory: `app/main.py`**
+
+Registered the new `metrics_bp` blueprint.
+
+#### Response Structure
+
+```json
+{
+  "success": true,
+  "data": {
+    "timestamp": "2026-06-06T11:51:00",
+    "jobs": {
+      "total": 15,
+      "queued": 2,
+      "processing": 1,
+      "completed": 10,
+      "failed": 2,
+      "success_rate": 66.7,
+      "average_processing_time": 0.234,
+      "total_retries": 3
+    },
+    "errors": {
+      "total": 45,
+      "client_errors": 30,
+      "server_errors": 15
+    },
+    "insights": {
+      "total": 10,
+      "healthy": 6,
+      "degraded": 2,
+      "unhealthy": 2,
+      "average_health_score": 0.82
+    },
+    "queue": {
+      "pending_jobs": 2
+    },
+    "workers": {
+      "total": 2,
+      "alive": 2,
+      "dead": 0
+    },
+    "system": {
+      "api_hits": 147
+    }
+  },
+  "error": null
+}
+```
+
+#### Files Changed
+
+- `app/routes/metrics_routes.py` — **new file**, system metrics endpoint
+- `app/main.py` — registered `metrics_bp` blueprint
+- `docs/LogProcessingMigration.md` — this documentation added
+
+#### Files Unchanged
+
+- `app/models/file_job.py` — no model changes needed
+- `app/models/log_insight.py` — no model changes needed
+- `app/jobs/file_processing.py` — no worker changes needed
+- `app/routes/insight_routes.py` — no insight route changes needed
+
+#### How To Test
+
+Run a syntax check:
+
+```bash
+python -m compileall app
+```
+
+Run the system:
+
+```bash
+docker compose up -d --build
+```
+
+Upload a few files first (to generate metrics):
+
+```bash
+curl -X POST http://localhost:5000/upload -F "file=@samples/nginx_access.log"
+curl -X POST http://localhost:5000/upload -F "file=@sample.txt"
+```
+
+Test the metrics endpoint:
+
+```bash
+curl http://localhost:5000/metrics
+```
+
+Verify the response contains all 6 categories with real values.
+
+#### Concept Learned
+
+**Aggregate operational signals into a single operational endpoint.**
+
+Before this step, metrics were scattered across multiple endpoints and data stores. Now `/metrics` provides a unified operational snapshot that answers the key monitoring questions:
+
+- Is the pipeline keeping up? (`jobs.queued` vs `workers.alive`)
+- Are jobs failing? (`jobs.success_rate`, `jobs.failed`)
+- Are errors client-side or server-side? (`errors.client_errors` vs `errors.server_errors`)
+- Is the system healthy overall? (`insights.average_health_score`)
+- Do we need to scale workers? (`queue.pending_jobs` vs `workers.alive`)
+
+This is the endpoint that monitoring tools (Prometheus, Grafana, Datadog) would scrape. It follows the pattern of exposing a `/metrics` or `/health` endpoint that consolidates internal state into an external signal.
