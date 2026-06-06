@@ -1694,3 +1694,162 @@ Before this step, metrics were scattered across multiple endpoints and data stor
 - Do we need to scale workers? (`queue.pending_jobs` vs `workers.alive`)
 
 This is the endpoint that monitoring tools (Prometheus, Grafana, Datadog) would scrape. It follows the pattern of exposing a `/metrics` or `/health` endpoint that consolidates internal state into an external signal.
+
+### Step 15 - Worker Heartbeat Improvement
+
+#### Goal
+
+Track stale workers reliably using Redis TTL and enriched heartbeat metadata, so the system can distinguish between active, stale, dead, and starting workers.
+
+#### What Was Already Present
+
+- The worker already sent heartbeats to Redis every 5 seconds.
+- The heartbeat stored a raw timestamp: `r.set(f"worker:{name}:heartbeat", time.time())`.
+- `/debug/workers` checked if `(now - last_seen) < 10` to label workers as "alive" or "dead".
+- The heartbeat thread ran as a daemon thread alongside the RQ worker.
+
+#### Problems with the Old Approach
+
+1. **No auto-expiry**: If a worker process crashed, the heartbeat key remained in Redis forever. The debug endpoint would show it as "alive" if the timestamp happened to be recent, or "dead" based on a hardcoded 10-second threshold — but the key itself never disappeared.
+2. **No enrichment**: The heartbeat only stored a timestamp. There was no uptime tracking, no stability scoring, no start time recording.
+3. **Binary status**: Workers were only "alive" or "dead". There was no "stale" (slow heartbeats) or "starting" (registered but not yet beating) state.
+4. **Race condition**: A worker starting up might be queried before its first heartbeat, showing as "dead" even though it was healthy.
+
+#### Changes Made
+
+**1. Updated Worker: `app/worker.py`**
+
+- Added `HEARTBEAT_TTL = 30` — Redis key auto-expires if worker stops sending heartbeats.
+- Added `HEARTBEAT_INTERVAL = 5` — explicit constant for clarity.
+- Heartbeat now uses `r.set(key, timestamp, ex=HEARTBEAT_TTL)` — the `ex` parameter sets TTL.
+- Added a second Redis hash (`worker:{name}:info`) storing enriched metadata:
+  - `status`: active/starting
+  - `started_at`: ISO timestamp of worker start
+  - `uptime_seconds`: cumulative uptime
+  - `consecutive_beats`: stability counter (resets on heartbeat failure)
+- Added exception handling in heartbeat loop — if Redis fails, beats reset and loop continues.
+- Added startup registration — worker writes initial "starting" state before heartbeat thread begins.
+- Heartbeat log now includes beat number and uptime for traceability.
+
+**2. Updated Debug Endpoint: `app/routes/system_routes.py`**
+
+- `/debug/workers` now uses **Redis TTL** as the primary stale-detection signal, not just time arithmetic.
+- Status logic:
+  - `ttl <= 0` → `dead` (key expired, worker stopped)
+  - `seconds_since > 15` → `stale` (beating slowly, may be overloaded)
+  - otherwise → `active` (healthy)
+- Also detects `starting` workers — those with `info` hash but no heartbeat key yet.
+- Returns enriched response fields:
+  - `last_seen_iso` — human-readable timestamp
+  - `seconds_since_heartbeat` — how long since last beat
+  - `ttl_remaining` — seconds until Redis auto-deletes the key
+  - `uptime_seconds` — cumulative worker uptime
+  - `consecutive_beats` — stability score
+  - `started_at` — when worker began
+  - `reason` — explanation for dead/starting status
+
+**3. Updated Home Route**
+
+Added `insights_endpoint` and `metrics_endpoint` to the root response so API discovery is complete.
+
+#### Files Changed
+
+- `app/worker.py` — enriched heartbeat with TTL, metadata hash, exception handling
+- `app/routes/system_routes.py` — improved `/debug/workers` with TTL-based detection, 4 status states, enriched response
+- `docs/LogProcessingMigration.md` — this documentation added
+
+#### Files Unchanged
+
+- `app/models/*` — no model changes needed
+- `app/jobs/file_processing.py` — no processing logic changes needed
+- `app/routes/file_routes.py` — no file route changes needed
+- `app/routes/insight_routes.py` — no insight route changes needed
+- `app/routes/metrics_routes.py` — no metrics route changes needed
+
+#### Worker Status States
+
+| Status | Meaning | Trigger |
+|--------|---------|---------|
+| `active` | Healthy and beating normally | TTL > 0 and last beat < 15s ago |
+| `stale` | Beating but slowly (overloaded?) | TTL > 0 but last beat > 15s ago |
+| `dead` | Stopped sending heartbeats | Redis key expired (TTL = 0) |
+| `starting` | Registered but not yet beating | Has `info` hash but no heartbeat key |
+
+#### Response Example
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "worker": "task-worker-7f8a9b",
+      "status": "active",
+      "last_seen": 1754515860.123,
+      "last_seen_iso": "2026-06-06T11:51:00",
+      "seconds_since_heartbeat": 2.3,
+      "ttl_remaining": 28,
+      "uptime_seconds": 3600.5,
+      "consecutive_beats": 720,
+      "started_at": "2026-06-06T10:51:00"
+    },
+    {
+      "worker": "task-worker-old-3c4d5e",
+      "status": "dead",
+      "last_seen": null,
+      "seconds_since_heartbeat": null,
+      "ttl_remaining": 0,
+      "uptime_seconds": null,
+      "consecutive_beats": null,
+      "reason": "Redis key expired — worker stopped sending heartbeats"
+    }
+  ],
+  "error": null
+}
+```
+
+#### How To Test
+
+Run a syntax check:
+
+```bash
+python -m compileall app
+```
+
+Run the system:
+
+```bash
+docker compose up -d --build
+```
+
+Check worker status:
+
+```bash
+curl http://localhost:5000/debug/workers
+```
+
+Simulate a dead worker by stopping the worker container:
+
+```bash
+docker stop task-worker
+# Wait 30 seconds for TTL to expire
+curl http://localhost:5000/debug/workers
+```
+
+The stopped worker should show `status: "dead"` with `ttl_remaining: 0`.
+
+Restart the worker:
+
+```bash
+docker compose up -d worker
+curl http://localhost:5000/debug/workers
+```
+
+The new worker should show `status: "active"` with `consecutive_beats` climbing.
+
+#### Concept Learned
+
+**Use TTL-based expiry, not time arithmetic, for heartbeat stale detection.**
+
+Before this step, the system relied on `(now - last_seen) < 10` — a client-side calculation that could be wrong if clocks drifted, API was slow, or Redis had stale data. By using Redis `SET ... EX`, the server itself enforces expiry: if the worker dies, the key disappears automatically. This is the same pattern used by distributed systems (etcd leases, ZooKeeper ephemeral nodes, Consul TTL checks) for reliable failure detection.
+
+The enriched metadata (uptime, consecutive beats, start time) transforms heartbeat from a binary alive/dead signal into a **health gradient** that operators can use to detect degrading workers before they fail completely.
