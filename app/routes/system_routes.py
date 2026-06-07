@@ -21,6 +21,7 @@ def home():
         "files_endpoint": "GET /files",
         "insights_endpoint": "GET /insights",
         "metrics_endpoint": "GET /metrics",
+        "queue_endpoint": "GET /queue/status"
     }
 
 

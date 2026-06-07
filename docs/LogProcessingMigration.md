@@ -1853,3 +1853,160 @@ The new worker should show `status: "active"` with `consecutive_beats` climbing.
 Before this step, the system relied on `(now - last_seen) < 10` — a client-side calculation that could be wrong if clocks drifted, API was slow, or Redis had stale data. By using Redis `SET ... EX`, the server itself enforces expiry: if the worker dies, the key disappears automatically. This is the same pattern used by distributed systems (etcd leases, ZooKeeper ephemeral nodes, Consul TTL checks) for reliable failure detection.
 
 The enriched metadata (uptime, consecutive beats, start time) transforms heartbeat from a binary alive/dead signal into a **health gradient** that operators can use to detect degrading workers before they fail completely.
+
+### Step 16 - Queue Monitoring
+
+#### Goal
+
+Show pending jobs and queue size, plus database job breakdown and throughput estimates, so operators can detect backlog, idle, or overloaded states.
+
+#### Requested Metrics
+
+- Pending jobs in RQ queue
+- Queue size
+- Job counts by status (queued, processing, completed, failed)
+
+#### What Was Already Present
+
+- `queue.count` from RQ already exposed the Redis queue size.
+- `FileJob` already stored status fields (`queued`, `processing`, `completed`, `failed`).
+- `/metrics` from Step 14 already included `queue.pending_jobs` as one field in a large snapshot.
+- The scheduler already checked for stale processing jobs.
+
+#### What Needed To Change
+
+The queue metrics were buried inside `/metrics` as a single number. There was no dedicated endpoint for queue-specific monitoring, no throughput estimation, and no health signal that could alert operators to backlog conditions (jobs waiting but no workers processing).
+
+#### Changes Made
+
+**1. New Route File: `app/routes/queue_routes.py`**
+
+Created a dedicated `queue_bp` blueprint with one endpoint:
+
+- **`GET /queue/status`** — returns structured queue metrics with 4 categories:
+
+| Category | Metrics |
+|----------|---------|
+| `rq_queue` | `pending_jobs` — jobs waiting in Redis RQ queue |
+| `database` | `total`, `queued`, `processing`, `completed`, `failed` — job counts by status |
+| `throughput` | `completed_last_hour` — jobs finished in last 60 minutes; `estimated_clear_time` — rough ETA to clear backlog |
+| `health` | Categorical signal: `idle`, `healthy`, `backlogged`, `overloaded` |
+
+**Health signal logic:**
+
+| State | Condition | Meaning |
+|-------|-----------|---------|
+| `idle` | No pending jobs, no queued DB jobs | System has no work |
+| `backlogged` | Pending jobs exist but nothing in `processing` | Workers may be dead or not picking up jobs |
+| `overloaded` | > 10 pending jobs in queue | Queue depth suggests need for more workers |
+| `healthy` | Some pending jobs, some processing | Normal operating state |
+
+**2. Updated App Factory: `app/main.py`**
+
+Registered the new `queue_bp` blueprint.
+
+**3. Updated Home Route (in `system_routes.py`)**
+
+Added `queue_endpoint` to root response for API discovery completeness.
+
+#### Response Structure
+
+```json
+{
+  "success": true,
+  "data": {
+    "timestamp": "2026-06-07T10:04:00",
+    "rq_queue": {
+      "pending_jobs": 3
+    },
+    "database": {
+      "total": 25,
+      "queued": 3,
+      "processing": 1,
+      "completed": 20,
+      "failed": 1
+    },
+    "throughput": {
+      "completed_last_hour": 12,
+      "estimated_clear_time": "3 minutes (1 worker)"
+    },
+    "health": "healthy"
+  },
+  "error": null
+}
+```
+
+#### Files Changed
+
+- `app/routes/queue_routes.py` — **new file**, queue monitoring endpoint
+- `app/main.py` — registered `queue_bp` blueprint
+- `app/routes/system_routes.py` — added `queue_endpoint` to home route
+- `docs/LogProcessingMigration.md` — this documentation added
+
+#### Files Unchanged
+
+- `app/models/*` — no model changes needed
+- `app/jobs/file_processing.py` — no worker changes needed
+- `app/worker.py` — no heartbeat changes needed
+- `app/routes/insight_routes.py` — no insight route changes needed
+- `app/routes/metrics_routes.py` — no metrics route changes needed
+
+#### How To Test
+
+Run a syntax check:
+
+```bash
+python -m compileall app
+```
+
+Run the system:
+
+```bash
+docker compose up -d --build
+```
+
+Check queue status with no jobs:
+
+```bash
+curl http://localhost:5000/queue/status
+```
+
+Expected: `health: "idle"`, `pending_jobs: 0`.
+
+Upload several files rapidly to create backlog:
+
+```bash
+for i in {1..5}; do
+  curl -X POST http://localhost:5000/upload -F "file=@samples/nginx_access.log"
+done
+```
+
+Check queue status during processing:
+
+```bash
+curl http://localhost:5000/queue/status
+```
+
+Expected: `health: "healthy"` or `"overloaded"`, `pending_jobs` > 0, `throughput.completed_last_hour` climbing.
+
+Stop the worker container and check again:
+
+```bash
+docker stop task-worker
+curl http://localhost:5000/queue/status
+```
+
+Expected: `health: "backlogged"` — jobs in queue but nothing processing.
+
+#### Concept Learned
+
+**Queue depth is an early warning signal, not just a number.**
+
+Before this step, `pending_jobs` was a single integer inside `/metrics`. Now `/queue/status` provides a **health gradient** that operators can act on:
+
+- `idle` → scale workers down (save resources)
+- `healthy` → normal operation
+- `backlogged` → workers may be dead (check `/debug/workers`)
+- `overloaded` → scale workers up (add capacity)
+
+The throughput estimate (`completed_last_hour`) turns queue depth into a **capacity planning signal**: if the queue is growing faster than workers can clear it, the system needs more capacity. This is the same pattern used by Kubernetes HPA (Horizontal Pod Autoscaler), AWS Auto Scaling, and Celery monitoring dashboards.

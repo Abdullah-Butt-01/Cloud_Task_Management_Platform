@@ -50,6 +50,9 @@ def create_app(init_db=True, start_background_scheduler=True):
     from app.routes.metrics_routes import metrics_bp
     app.register_blueprint(metrics_bp)
 
+    from app.routes.queue_routes import queue_bp
+    app.register_blueprint(queue_bp)
+
     return app
 
 
