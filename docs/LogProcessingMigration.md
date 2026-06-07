@@ -2010,3 +2010,159 @@ Before this step, `pending_jobs` was a single integer inside `/metrics`. Now `/q
 - `overloaded` → scale workers up (add capacity)
 
 The throughput estimate (`completed_last_hour`) turns queue depth into a **capacity planning signal**: if the queue is growing faster than workers can clear it, the system needs more capacity. This is the same pattern used by Kubernetes HPA (Horizontal Pod Autoscaler), AWS Auto Scaling, and Celery monitoring dashboards.
+
+### Step 17 - Health Endpoint
+
+#### Goal
+
+Check DB, Redis, and worker connectivity in a single endpoint, returning a structured health report with per-service status and an overall system status.
+
+#### Requested Checks
+
+- Database (PostgreSQL)
+- Redis (cache + queue broker)
+- Workers (heartbeat freshness)
+
+#### What Was Already Present
+
+- `db.session` from SQLAlchemy was already used throughout the app.
+- `redis_conn` from `app/extensions.py` already connected to Redis.
+- `queue` from RQ was already used for job enqueueing.
+- Worker heartbeat keys were already written to Redis (Step 15).
+- `/debug/workers` already checked worker status but was a debug endpoint, not a health check.
+- `/metrics` from Step 14 included some operational data but no service connectivity checks.
+
+#### What Needed To Change
+
+There was no single endpoint that **proactively checked** whether each service was actually reachable and functional. The existing endpoints assumed connectivity — they would fail with 500 errors if DB or Redis were down, but they didn't provide a structured health report that load balancers, Kubernetes, or monitoring tools could use.
+
+A proper health endpoint needs:
+- **Per-service checks** with isolated try/except blocks (one failure doesn't break others)
+- **Overall status** aggregation (healthy / degraded / unhealthy)
+- **HTTP status codes** that match the health state (200 for healthy, 503 for unhealthy)
+- **Structured response** that monitoring tools can parse automatically
+
+#### Changes Made
+
+**1. New Route File: `app/routes/health_routes.py`**
+
+Created a dedicated `health_bp` blueprint with one endpoint and four check functions:
+
+| Check Function | What It Tests | Pass Criteria |
+|----------------|-------------|---------------|
+| `check_database()` | `SELECT 1` on PostgreSQL | Query executes without exception |
+| `check_redis()` | `PING` on Redis | Redis responds to PING |
+| `check_workers()` | Heartbeat keys in Redis | At least one active worker (TTL > 0, beat < 15s) |
+| `check_queue()` | RQ queue access | `queue.count` returns without exception |
+
+**Overall status logic:**
+
+| Status | Condition | HTTP Code |
+|--------|-----------|-----------|
+| `healthy` | All services up | 200 |
+| `degraded` | Workers or queue down, but DB + Redis up | 200 |
+| `unhealthy` | DB or Redis down (critical services) | 503 |
+
+**Response structure:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "timestamp": "2026-06-07T10:38:00",
+    "status": "healthy",
+    "version": "1.0.0",
+    "services": {
+      "database": { "status": "up" },
+      "redis": { "status": "up" },
+      "workers": { "status": "up", "total_workers": 2, "active_workers": 2, "stale_workers": 0 },
+      "queue": { "status": "up", "pending_jobs": 0 }
+    }
+  },
+  "error": null
+}
+```
+
+**2. Updated App Factory: `app/main.py`**
+
+Registered the new `health_bp` blueprint.
+
+**3. Updated Home Route (in `system_routes.py`)**
+
+Added `health_endpoint` to root response for API discovery.
+
+#### Files Changed
+
+- `app/routes/health_routes.py` — **new file**, health check endpoint
+- `app/main.py` — registered `health_bp` blueprint
+- `app/routes/system_routes.py` — added `health_endpoint` to home route
+- `docs/LogProcessingMigration.md` — this documentation added
+
+#### Files Unchanged
+
+- `app/models/*` — no model changes needed
+- `app/jobs/file_processing.py` — no processing logic changes needed
+- `app/worker.py` — no heartbeat changes needed
+- `app/routes/insight_routes.py` — no insight route changes needed
+- `app/routes/metrics_routes.py` — no metrics route changes needed
+- `app/routes/queue_routes.py` — no queue route changes needed
+
+#### How To Test
+
+Run a syntax check:
+
+```bash
+python -m compileall app
+```
+
+Run the system:
+
+```bash
+docker compose up -d --build
+```
+
+Test healthy state:
+
+```bash
+curl http://localhost:5000/health
+```
+
+Expected: `status: "healthy"`, HTTP 200, all services `up`.
+
+Test degraded state (stop worker):
+
+```bash
+docker stop task-worker
+sleep 35  # Wait for TTL expiry
+curl http://localhost:5000/health
+```
+
+Expected: `status: "degraded"`, HTTP 200, workers `status: "down"` or `degraded`.
+
+Test unhealthy state (stop DB):
+
+```bash
+docker stop postgres-db
+curl http://localhost:5000/health
+```
+
+Expected: `status: "unhealthy"`, HTTP 503, database `status: "down"` with error message.
+
+Restart all services:
+
+```bash
+docker compose up -d
+```
+
+#### Concept Learned
+
+**Health checks must be proactive, isolated, and machine-readable.**
+
+Before this step, service failures would only be detected when an API request actually failed. Now `/health` proactively tests each dependency and returns a structured report that:
+
+- **Load balancers** can use to route traffic away from unhealthy instances (HTTP 503)
+- **Kubernetes** can use for liveness and readiness probes (`/health` with 5-second timeout)
+- **Monitoring tools** (PagerDuty, Datadog, Grafana) can parse the JSON and alert on specific service failures
+- **Operators** can see which service is down without reading stack traces
+
+The isolated try/except pattern is critical: if Redis is down, the database check still runs and reports its own status. This prevents a single failure from masking the health of other services. The status hierarchy (critical vs non-critical) ensures that a worker outage doesn't make the whole system appear dead to a load balancer, while a database outage does trigger a 503.

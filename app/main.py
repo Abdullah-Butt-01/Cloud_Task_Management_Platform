@@ -53,6 +53,9 @@ def create_app(init_db=True, start_background_scheduler=True):
     from app.routes.queue_routes import queue_bp
     app.register_blueprint(queue_bp)
 
+    from app.routes.health_routes import health_bp
+    app.register_blueprint(health_bp)
+
     return app
 
 
