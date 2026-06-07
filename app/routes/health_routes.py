@@ -166,4 +166,4 @@ def health_check():
     # Return 503 if unhealthy, 200 otherwise
     status_code = 503 if overall_status == "unhealthy" else 200
 
-    return success_response(health)
+    return success_response(health, status_code)
