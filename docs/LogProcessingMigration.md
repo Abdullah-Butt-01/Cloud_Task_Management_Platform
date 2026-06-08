@@ -2166,3 +2166,143 @@ Before this step, service failures would only be detected when an API request ac
 - **Operators** can see which service is down without reading stack traces
 
 The isolated try/except pattern is critical: if Redis is down, the database check still runs and reports its own status. This prevents a single failure from masking the health of other services. The status hierarchy (critical vs non-critical) ensures that a worker outage doesn't make the whole system appear dead to a load balancer, while a database outage does trigger a 503.
+
+### Step 18 - Setup React Frontend
+
+#### Goal
+
+Initialize a React dashboard frontend that will replace the Jinja2 HTML template. Set up the project structure, routing, and basic layout so subsequent steps can build pages on top of it.
+
+#### What Was Already Present
+
+- `app/templates/dashboard.html` — a Jinja2 template served by Flask, auto-refreshed every 5 seconds, displayed file jobs in a basic HTML table.
+- The Flask API already exposed all endpoints needed by a frontend: `/files`, `/upload`, `/insights`, `/metrics`, `/health`, `/queue/status`.
+- `docker-compose.yml` already ran the API on port 5000.
+
+#### What Needed To Change
+
+The Jinja2 template was server-rendered and limited:
+- No client-side interactivity (sorting, filtering, pagination)
+- No real-time updates without full page reload (meta refresh was crude)
+- No charting or visualization capabilities
+- Not reusable as a standalone SPA
+- Mixed presentation logic with backend code
+
+A React frontend provides:
+- Component-based architecture for maintainability
+- Client-side routing for multiple views (dashboard, upload, jobs, insights)
+- Real-time data fetching with `axios` and `useEffect`
+- Foundation for chart libraries (Step 22)
+- Clean separation between API and presentation
+
+#### Changes Made
+
+**1. New Directory: `frontend/`**
+
+Created a standard Create React App structure:
+
+```
+frontend/
+├── package.json          # Dependencies + proxy to Flask API
+├── public/
+│   └── index.html        # HTML shell
+└── src/
+    ├── index.js          # React root render
+    ├── index.css         # Global styles
+    ├── App.js            # Router + layout + placeholder pages
+    └── App.css           # Layout and navigation styles
+```
+
+**2. `frontend/package.json`**
+
+Key configuration:
+- `"proxy": "http://localhost:5000"` — dev server proxies API calls to Flask, avoiding CORS issues during development
+- Dependencies: `react`, `react-dom`, `react-scripts`, `react-router-dom`, `axios`
+
+**3. `frontend/src/App.js`**
+
+- Sets up `BrowserRouter` with 4 routes:
+  - `/` — Dashboard (Step 19)
+  - `/upload` — File upload (Step 20)
+  - `/jobs` — Jobs table (Step 21)
+  - `/insights` — Insights + charts (Step 22)
+- Includes a navigation bar with `Link` components
+- All page components are currently placeholders that will be filled in subsequent steps
+
+**4. `frontend/src/App.css`**
+
+- Dark navigation bar (`#2c3e50`)
+- Responsive layout with centered content area
+- Hover effects on navigation links
+- Card-style page containers
+
+#### Files Changed
+
+- `frontend/package.json` — **new file**, project manifest and dependencies
+- `frontend/public/index.html` — **new file**, HTML shell
+- `frontend/src/index.js` — **new file**, React entry point
+- `frontend/src/index.css` — **new file**, global styles
+- `frontend/src/App.js` — **new file**, router and layout
+- `frontend/src/App.css` — **new file**, layout and navigation styles
+- `docs/LogProcessingMigration.md` — this documentation added
+
+#### Files Unchanged (Backend Stable)
+
+- All backend files unchanged — this is a pure frontend addition
+- `app/templates/dashboard.html` still exists and works; React will replace it in production builds
+
+#### How To Test
+
+**Prerequisites:** Node.js 18+ and npm installed locally.
+
+```bash
+# 1. Navigate to frontend directory
+cd frontend
+
+# 2. Install dependencies
+npm install
+
+# 3. Start the React dev server (runs on port 3000, proxies API to :5000)
+npm start
+```
+
+The browser should open to `http://localhost:3000` showing:
+- A dark navigation bar with links: Dashboard, Upload, Jobs, Insights
+- A placeholder page for whichever route is active
+- Navigation between routes should work without page reloads
+
+**Verify API proxy works:**
+
+Ensure Flask API is running on `http://localhost:5000`, then in the React app (or browser console):
+
+```javascript
+fetch('/health').then(r => r.json()).then(console.log)
+// Should return the health check JSON from Flask
+```
+
+**Build for production:**
+
+```bash
+npm run build
+```
+node 
+This creates a `frontend/build/` directory with static files that can be served by Flask or nginx.
+
+#### Integration with Docker (Future Step)
+
+For now, the frontend runs separately in development. In a future DevOps step, the Docker setup will be updated to:
+- Build the React app during image build
+- Serve static files from Flask (using `send_from_directory`) or nginx
+- Run both services in the same `docker-compose.yml`
+
+#### Concept Learned
+
+**Separate frontend and backend concerns.**
+
+Before this step, the presentation layer was tightly coupled to Flask via Jinja2 templates. Now:
+- The **backend** provides a pure JSON API (already done in Steps 13–17)
+- The **frontend** is a standalone SPA that consumes that API
+- They can be developed, deployed, and scaled independently
+- The `proxy` setting in `package.json` eliminates CORS headaches during development by forwarding `/api` calls to the Flask server
+
+This is the standard architecture for modern web applications: backend-as-API, frontend-as-SPA. The Jinja2 template remains as a fallback during transition, but all new UI development happens in React.
