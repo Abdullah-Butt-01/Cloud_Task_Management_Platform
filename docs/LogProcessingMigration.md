@@ -2306,3 +2306,115 @@ Before this step, the presentation layer was tightly coupled to Flask via Jinja2
 - The `proxy` setting in `package.json` eliminates CORS headaches during development by forwarding `/api` calls to the Flask server
 
 This is the standard architecture for modern web applications: backend-as-API, frontend-as-SPA. The Jinja2 template remains as a fallback during transition, but all new UI development happens in React.
+
+### Step 19 - Build Dashboard Layout
+
+#### Goal
+
+Create the real Dashboard page with system overview cards that fetch data from `/metrics`, `/health`, and `/queue/status`, replacing the Step 18 placeholder.
+
+#### What Was Already Present
+
+- Step 18 set up React with routing, navigation, and placeholder pages.
+- The API already exposed `/metrics`, `/health`, `/queue/status` (Steps 14, 17, 16).
+- The Jinja2 template (`dashboard.html`) showed a basic table but was server-rendered.
+
+#### What Needed To Change
+
+The placeholder Dashboard page needed to become a real data-driven view with:
+- Live data fetching from multiple API endpoints
+- Visual summary cards (not just a raw table)
+- Color-coded health indicators
+- Auto-refresh without page reload
+- Loading and error states
+
+#### Changes Made
+
+**1. New Component: `frontend/src/Dashboard.js`**
+
+Replaces the placeholder with a full dashboard that:
+- Fetches `/metrics`, `/health`, `/queue/status` in parallel via `Promise.all`
+- Uses `axios` with `.catch()` on each request so one failing endpoint doesn't break the whole dashboard
+- Auto-refreshes every 10 seconds via `setInterval`
+- Cleans up interval on unmount to prevent memory leaks
+- Shows loading spinner while fetching, error message on failure
+
+**Card layout (6 cards):**
+
+| Card | Data Source | Metrics Shown |
+|------|-------------|---------------|
+| Jobs | `/metrics` | total, completed, failed, success_rate |
+| Queue | `/queue/status` | pending, processing, health, throughput |
+| Insights | `/metrics` | total, healthy, unhealthy, avg_health_score |
+| Errors | `/metrics` | total, client_errors, server_errors |
+| Workers | `/metrics` | total, alive, dead |
+| System | `/metrics` | api_hits, avg_processing_time |
+
+**Color coding:**
+- Green (`success`) — healthy values: high success rate, active workers, healthy insights
+- Yellow (`warning`) — caution values: pending jobs, degraded health, 4xx errors
+- Red (`danger`) — critical values: failed jobs, dead workers, unhealthy insights, 5xx errors
+
+**Health banner** at top shows overall system status with DB/Redis/Worker detail.
+
+**2. New Styles: `frontend/src/Dashboard.css`**
+
+- Responsive CSS grid (`auto-fill, minmax(280px, 1fr)`) — cards reflow on mobile
+- Card hover effects (lift + shadow)
+- Accent color top borders on each card type (blue for jobs, purple for queue, etc.)
+- Health banner with background colors matching status (green/yellow/red)
+
+**3. Updated: `frontend/src/App.js`**
+
+Replaced inline placeholder `Dashboard` with `import Dashboard from './Dashboard'`.
+
+#### Files Changed
+
+- `frontend/src/Dashboard.js` — **new file**, real dashboard component
+- `frontend/src/Dashboard.css` — **new file**, dashboard styling
+- `frontend/src/App.js` — **updated**, imports real Dashboard
+- `docs/LogProcessingMigration.md` — this documentation added
+
+#### Files Unchanged
+
+- All backend files — pure frontend change
+- `frontend/src/App.css` — navigation styling unchanged
+- `frontend/src/index.js` — entry point unchanged
+- Other placeholder pages (Upload, Jobs, Insights) — still placeholders
+
+#### How To Test
+
+Ensure Flask API is running on `http://localhost:5000`:
+
+```bash
+docker compose up -d
+```
+
+Start React dev server:
+
+```bash
+cd frontend
+npm start
+```
+
+Navigate to `http://localhost:3000/` (Dashboard route).
+
+Verify:
+- Cards appear with real data from API
+- Health banner shows correct color (green/yellow/red)
+- "Last updated" timestamp changes every 10 seconds
+- Cards have hover lift effect
+- Resize browser — cards reflow responsively
+- Stop API — dashboard shows error state gracefully
+
+#### Concept Learned
+
+**Aggregate multiple API endpoints into a unified dashboard view.**
+
+Before this step, each metric lived on its own endpoint. Now the dashboard:
+- **Parallel fetches** all endpoints at once (not sequential)
+- **Graceful degradation** — if one endpoint fails, others still display
+- **Visual hierarchy** — color coding turns numbers into actionable signals
+- **Auto-refresh** — replaces the crude `<meta http-equiv="refresh">` from Jinja2
+
+This is the pattern used by Datadog, Grafana, and AWS CloudWatch dashboards: multiple data sources, one unified view, real-time updates, visual alerts.

@@ -1,0 +1,200 @@
+/* Step 19: Dashboard layout and card styling */
+
+.dashboard {
+  padding: 1rem 0;
+}
+
+.dashboard h1 {
+  font-size: 2rem;
+  color: #2c3e50;
+  margin-bottom: 0.5rem;
+}
+
+.last-updated {
+  color: #7f8c8d;
+  font-size: 0.9rem;
+  margin-bottom: 1.5rem;
+}
+
+.loading, .error {
+  padding: 3rem;
+  text-align: center;
+  font-size: 1.2rem;
+  color: #7f8c8d;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.error {
+  color: #e74c3c;
+  background: #fdf2f2;
+}
+
+/* Health banner */
+.health-banner {
+  padding: 1rem 1.5rem;
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  font-size: 1rem;
+}
+
+.health-healthy {
+  background: #d4edda;
+  border: 1px solid #c3e6cb;
+  color: #155724;
+}
+
+.health-degraded {
+  background: #fff3cd;
+  border: 1px solid #ffeeba;
+  color: #856404;
+}
+
+.health-unhealthy {
+  background: #f8d7da;
+  border: 1px solid #f5c6cb;
+  color: #721c24;
+}
+
+.health-label {
+  font-weight: 600;
+}
+
+.health-value {
+  font-weight: bold;
+  font-size: 1.1rem;
+}
+
+.health-detail {
+  margin-left: auto;
+  font-size: 0.85rem;
+  opacity: 0.8;
+}
+
+/* Cards grid */
+.cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.5rem;
+}
+
+/* Card */
+.card {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  overflow: hidden;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+}
+
+.card-header {
+  padding: 1rem 1.5rem;
+  background: #f8f9fa;
+  border-bottom: 1px solid #e9ecef;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.card-header h3 {
+  font-size: 1.1rem;
+  color: #2c3e50;
+  margin: 0;
+}
+
+.card-icon {
+  font-size: 1.5rem;
+}
+
+.card-body {
+  padding: 1rem 1.5rem;
+}
+
+/* Metric row */
+.metric-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.metric-row:last-child {
+  border-bottom: none;
+}
+
+.metric-label {
+  color: #6c757d;
+  font-size: 0.9rem;
+}
+
+.metric-value {
+  font-weight: 600;
+  font-size: 1rem;
+  color: #2c3e50;
+}
+
+/* Color coding */
+.success {
+  color: #28a745;
+}
+
+.warning {
+  color: #ffc107;
+}
+
+.danger {
+  color: #dc3545;
+}
+
+.health-text-healthy {
+  color: #28a745;
+}
+
+.health-text-degraded {
+  color: #ffc107;
+}
+
+.health-text-unhealthy,
+.health-text-backlogged,
+.health-text-overloaded {
+  color: #dc3545;
+}
+
+.health-text-idle {
+  color: #6c757d;
+}
+
+/* Card accent colors */
+.card-jobs .card-header {
+  border-top: 3px solid #3498db;
+}
+
+.card-queue .card-header {
+  border-top: 3px solid #9b59b6;
+}
+
+.card-insights .card-header {
+  border-top: 3px solid #2ecc71;
+}
+
+.card-errors .card-header {
+  border-top: 3px solid #e74c3c;
+}
+
+.card-workers .card-header {
+  border-top: 3px solid #f39c12;
+}
+
+.card-system .card-header {
+  border-top: 3px solid #1abc9c;
+}

@@ -2,14 +2,10 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import './App.css';
 
-// Step 18: Placeholder pages — will be built in Steps 19-22
-const Dashboard = () => (
-  <div className="page">
-    <h1>Dashboard</h1>
-    <p>System overview will appear here (Step 19).</p>
-  </div>
-);
+// Step 19: Real Dashboard page (replaces placeholder)
+import Dashboard from './Dashboard';
 
+// Step 18: Placeholder pages — will be built in Steps 19-22
 const UploadPage = () => (
   <div className="page">
     <h1>Upload Log File</h1>
