@@ -11,13 +11,6 @@ import JobsPage from './Jobs';
 
 // Step 18: Placeholder pages — will be built in Steps 19-22
 
-const JobsPage = () => (
-  <div className="page">
-    <h1>Processing Jobs</h1>
-    <p>Jobs table will appear here (Step 21).</p>
-  </div>
-);
-
 const InsightsPage = () => (
   <div className="page">
     <h1>Log Insights</h1>
