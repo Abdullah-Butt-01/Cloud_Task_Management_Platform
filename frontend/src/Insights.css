@@ -1,0 +1,406 @@
+/* Step 22: Insights page and chart styling */
+
+.insights-page {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.insights-page h1 {
+  font-size: 1.8rem;
+  color: #2c3e50;
+  margin: 0;
+}
+
+.insights-subtitle {
+  color: #7f8c8d;
+  margin-top: 0.25rem;
+  font-size: 1rem;
+}
+
+/* Header */
+.insights-header {
+  margin-bottom: 1.5rem;
+}
+
+/* Summary cards */
+.insights-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.summary-card {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  text-align: center;
+  transition: transform 0.2s;
+}
+
+.summary-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+}
+
+.summary-value {
+  display: block;
+  font-size: 2rem;
+  font-weight: 700;
+  color: #2c3e50;
+  line-height: 1.2;
+}
+
+.summary-label {
+  display: block;
+  color: #7f8c8d;
+  font-size: 0.9rem;
+  margin-top: 0.5rem;
+}
+
+/* Charts grid */
+.charts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.chart-card {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  padding: 1.5rem;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.chart-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+}
+
+.chart-card.full-width {
+  grid-column: 1 / -1;
+}
+
+/* Chart components */
+.chart-container {
+  width: 100%;
+}
+
+.chart-title {
+  font-size: 1.1rem;
+  color: #2c3e50;
+  margin: 0 0 1rem 0;
+  font-weight: 600;
+}
+
+.chart-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.pie-svg {
+  max-width: 200px;
+  margin: 0 auto;
+}
+
+/* Bar chart */
+.chart-bar {
+  transition: opacity 0.2s;
+  cursor: pointer;
+}
+
+.chart-bar:hover {
+  opacity: 0.8;
+}
+
+.chart-value-label {
+  font-size: 12px;
+  fill: #2c3e50;
+  font-weight: 600;
+}
+
+.chart-axis-label {
+  font-size: 11px;
+  fill: #7f8c8d;
+}
+
+/* Pie chart */
+.pie-chart-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  flex-wrap: wrap;
+}
+
+.pie-slice {
+  transition: transform 0.2s, opacity 0.2s;
+  cursor: pointer;
+  transform-origin: center;
+}
+
+.pie-slice:hover {
+  transform: scale(1.05);
+  opacity: 0.9;
+}
+
+.pie-legend {
+  flex: 1;
+  min-width: 150px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0;
+  font-size: 0.9rem;
+}
+
+.legend-color {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.legend-label {
+  color: #2c3e50;
+  flex: 1;
+}
+
+.legend-value {
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.legend-percent {
+  color: #7f8c8d;
+  font-size: 0.85rem;
+}
+
+/* Line chart */
+.chart-line {
+  transition: stroke-width 0.2s;
+}
+
+.chart-point {
+  transition: r 0.2s;
+  cursor: pointer;
+}
+
+.chart-point:hover {
+  r: 6;
+}
+
+.chart-point-label {
+  font-size: 11px;
+  fill: #2c3e50;
+  font-weight: 600;
+}
+
+/* Insights table */
+.insights-table-section {
+  margin-top: 2rem;
+}
+
+.insights-table-section h2 {
+  font-size: 1.3rem;
+  color: #2c3e50;
+  margin-bottom: 1rem;
+}
+
+.table-container {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  overflow-x: auto;
+}
+
+.insights-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.insights-table thead {
+  background: #f8f9fa;
+  border-bottom: 2px solid #e9ecef;
+}
+
+.insights-table th {
+  padding: 0.875rem 1rem;
+  text-align: left;
+  font-weight: 600;
+  color: #495057;
+  white-space: nowrap;
+}
+
+.insights-table th.right {
+  text-align: right;
+}
+
+.insights-table td {
+  padding: 0.875rem 1rem;
+  border-bottom: 1px solid #f0f0f0;
+  vertical-align: middle;
+}
+
+.insights-table td.right {
+  text-align: right;
+}
+
+.insights-table tbody tr:hover {
+  background: #f8f9fa;
+}
+
+.insights-table .mono {
+  font-family: 'Courier New', monospace;
+  font-weight: 600;
+  color: #3498db;
+}
+
+.insights-table .error-count {
+  color: #dc3545;
+  font-weight: 600;
+}
+
+.insights-table .date-cell {
+  white-space: nowrap;
+  color: #6c757d;
+  font-size: 0.85rem;
+}
+
+/* Health score badges */
+.health-score {
+  font-weight: 600;
+}
+
+.health-healthy {
+  color: #28a745;
+}
+
+.health-degraded {
+  color: #ffc107;
+}
+
+.health-unhealthy {
+  color: #dc3545;
+}
+
+.health-unknown {
+  color: #6c757d;
+}
+
+/* Status badges (same as Jobs) */
+.status-badge {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.status-healthy {
+  background: #d4edda;
+  color: #155724;
+}
+
+.status-degraded {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.status-unhealthy {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.status-unknown {
+  background: #e9ecef;
+  color: #495057;
+}
+
+/* No insights */
+.no-insights {
+  text-align: center;
+  padding: 3rem;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  color: #7f8c8d;
+  font-size: 1.1rem;
+}
+
+.no-insights a {
+  color: #3498db;
+  text-decoration: none;
+}
+
+.no-insights a:hover {
+  text-decoration: underline;
+}
+
+/* Refresh indicator */
+.refresh-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 1.5rem;
+  color: #7f8c8d;
+  font-size: 0.85rem;
+}
+
+.refresh-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #28a745;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+/* Loading and error */
+.loading, .error {
+  padding: 3rem;
+  text-align: center;
+  font-size: 1.2rem;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  color: #7f8c8d;
+}
+
+.error {
+  color: #dc3545;
+  background: #fdf2f2;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .charts-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .insights-summary {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .pie-chart-wrapper {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .summary-value {
+    font-size: 1.5rem;
+  }
+}

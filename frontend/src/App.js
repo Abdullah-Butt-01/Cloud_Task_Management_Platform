@@ -2,21 +2,10 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import './App.css';
 
-// Step 19: Real Dashboard page (replaces placeholder)
 import Dashboard from './Dashboard';
-
 import UploadPage from './Upload';
-
 import JobsPage from './Jobs';
-
-// Step 18: Placeholder pages — will be built in Steps 19-22
-
-const InsightsPage = () => (
-  <div className="page">
-    <h1>Log Insights</h1>
-    <p>Insights and charts will appear here (Step 22).</p>
-  </div>
-);
+import InsightsPage from './Insights';
 
 function App() {
   return (

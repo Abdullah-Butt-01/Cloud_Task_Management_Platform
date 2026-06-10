@@ -2719,3 +2719,219 @@ Before this step, the only way to view jobs was via `curl` or the Jinja2 HTML ta
 - **Contextual actions** — "View" link will lead to detailed insight (Step 22)
 
 The 5-second refresh interval is a pragmatic choice for a background processing system: fast enough to feel responsive, slow enough to not overwhelm the API. For production, this could be replaced with WebSocket push or Server-Sent Events (SSE) to reduce polling overhead.
+
+### Step 22 - Add Charts
+
+#### Goal
+
+Replace the placeholder Insights page with real charts visualizing processing metrics: status codes, error distribution, health trends, and endpoint popularity.
+
+#### What Was Already Present
+
+- Step 18 set up React routing with a placeholder Insights page.
+- Steps 19–21 built Dashboard, Upload, and Jobs pages.
+- The Flask API already exposed `/insights` and `/metrics` with full data.
+- The LogInsight model stored all parsed metrics including status counts, health scores, and top endpoints.
+
+#### What Needed To Change
+
+The placeholder Insights page was static text. It needed to become a visual analytics dashboard that:
+- Fetches insights and metrics from the API
+- Aggregates data across all uploads for overview charts
+- Shows status code distribution (bar chart)
+- Shows error category breakdown (pie chart)
+- Shows health distribution across uploads (pie chart)
+- Shows most popular endpoints (bar chart)
+- Shows trends over time: requests per upload, health score trend (line charts)
+- Displays summary cards with key numbers
+- Lists recent insights in a table
+- Auto-refreshes every 15 seconds
+
+#### Changes Made
+
+**1. New Component: `frontend/src/Insights.js`**
+
+Full insights page with 3 custom SVG chart components and data aggregation:
+
+| Component | Chart Type | Data Source | What It Shows |
+|-----------|-----------|-------------|---------------|
+| `BarChart` | Vertical bars | Aggregated status codes | HTTP status code frequency across all uploads |
+| `PieChart` | Pie slices | Aggregated errors/health | Error categories (4xx vs 5xx) or health distribution |
+| `LineChart` | Connected points | Last 10 uploads | Trends: requests per upload, health score over time |
+
+**Data aggregation logic:**
+- **Status codes**: Sums `status_200_count`, `status_301_count`, etc. across all insights, filters out zeros
+- **Error categories**: Sums `client_error_count` and `server_error_count`
+- **Health distribution**: Counts insights by `health_status` (healthy, degraded, unhealthy, unknown)
+- **Top endpoints**: Merges `top_endpoints` from all insights, sums counts by `METHOD /path`, shows top 8
+- **Requests per upload**: Last 10 insights, `total_requests` value
+- **Health trend**: Last 10 insights, `health_score` as percentage
+
+**Summary cards:**
+- Total Insights (from `/metrics`)
+- Total Jobs (from `/metrics`)
+- Total Errors (from `/metrics`)
+- Average Health (from `/metrics`)
+
+**Insights table:**
+- Last 10 insights with job ID, requests, errors, clients, endpoints, health score, status, created date
+
+**2. New Styles: `frontend/src/Insights.css`**
+
+- Summary cards grid (responsive, 4 cards)
+- Charts grid (2 columns on desktop, 1 on mobile)
+- Full-width line charts span both columns
+- Chart hover effects (bar opacity, pie slice scale, point radius)
+- Pie chart legend with color swatches, labels, values, percentages
+- SVG grid lines for readability
+- Insights table with health score color coding
+- Responsive: stacked layout on mobile, smaller summary values
+
+**3. Updated: `frontend/src/App.js`**
+
+Replaced inline placeholder `InsightsPage` with `import InsightsPage from './Insights'`.
+
+#### Chart Implementation Details
+
+All charts are **SVG-based** (no external library dependency):
+
+**BarChart:**
+- Calculates bar width based on data count
+- Scales bar height relative to max value
+- Grid lines at 0%, 25%, 50%, 75%, 100%
+- Value labels above bars, axis labels below
+- Hover: opacity change on bars
+
+**PieChart:**
+- Calculates slice angles from value proportions
+- Uses SVG path arcs for each slice
+- 6-color rotation for slices
+- Legend with color, label, value, percentage
+- Hover: scale up slice slightly
+
+**LineChart:**
+- Scales points to chart dimensions
+- Connects points with polyline
+- Grid lines for reference
+- Data points with value labels
+- Axis labels below
+- Hover: increase point radius
+
+#### Files Changed
+
+- `frontend/src/Insights.js` — **new file**, insights page with charts
+- `frontend/src/Insights.css` — **new file**, chart and insights styling
+- `frontend/src/App.js` — **updated**, imports real InsightsPage
+- `docs/LogProcessingMigration.md` — this documentation added
+
+#### Files Unchanged
+
+- All backend files — pure frontend change
+- `frontend/src/Dashboard.js`, `Upload.js`, `Jobs.js` — unchanged
+- All CSS files for other pages — unchanged
+
+#### Optional: Using Recharts Library
+
+For production, you may want to install a dedicated chart library:
+
+```bash
+cd frontend
+npm install recharts
+```
+
+Then replace the custom SVG components with Recharts equivalents:
+
+```javascript
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
+
+// Example: Status codes with Recharts
+<BarChart data={statusCodes} width={400} height={200}>
+  <CartesianGrid strokeDasharray="3 3" />
+  <XAxis dataKey="label" />
+  <YAxis />
+  <Tooltip />
+  <Bar dataKey="value" fill="#3498db" />
+</BarChart>
+```
+
+The custom SVG approach is used here to avoid adding dependencies and keep the project lightweight. Recharts provides more features (tooltips, animations, legends, responsive containers) with less code.
+
+#### How To Test
+
+Ensure Flask API is running on `http://localhost:5000`:
+
+```bash
+docker compose up -d
+```
+
+Start React dev server:
+
+```bash
+cd frontend
+npm start
+```
+
+Navigate to `http://localhost:3000/insights`.
+
+**Test 1: Empty state**
+- With no insights in database, verify: "No insights available yet" message with upload link.
+
+**Test 2: Upload and view charts**
+1. Go to `/upload` and upload `samples/nginx_access.log`
+2. Wait for processing (check `/jobs` for status)
+3. Go to `/insights`
+4. Verify: summary cards show data, bar chart shows status codes, pie chart shows errors, table shows the insight
+
+**Test 3: Multiple uploads for trend charts**
+```bash
+for i in {1..5}; do
+  curl -X POST http://localhost:5000/upload -F "file=@samples/nginx_access.log"
+  sleep 2
+done
+```
+- Refresh `/insights`
+- Verify: line charts appear showing "Requests Per Upload" and "Health Score Trend"
+- Verify: bar chart shows aggregated status codes (5 uploads × 10 requests = 50 total)
+- Verify: pie chart shows error distribution
+
+**Test 4: Chart interactions**
+- Hover over bar chart bars — verify opacity change
+- Hover over pie chart slices — verify scale effect
+- Hover over line chart points — verify radius increase
+
+**Test 5: Auto-refresh**
+- Upload a new file while on `/insights`
+- Wait 15 seconds
+- Verify: new data appears without manual refresh
+
+**Test 6: Responsive**
+- Resize browser to mobile width (< 768px)
+- Verify: charts stack vertically, summary cards go to 2 columns
+- Verify: table scrolls horizontally
+
+**Test 7: Error handling**
+- Stop Flask API while on `/insights`
+- Verify: error message appears gracefully
+- Restart API, verify: data returns after next refresh
+
+**Test 8: Cross-check with API**
+```bash
+curl http://localhost:5000/insights
+curl http://localhost:5000/metrics
+```
+- Verify React charts match API data (aggregated counts should match)
+
+#### Concept Learned
+
+**Visual analytics transform raw numbers into actionable patterns.**
+
+Before this step, insights were accessible only through JSON API responses or database queries. Now the charts provide:
+
+- **Pattern recognition** — bar charts show which status codes dominate; pie charts reveal whether errors are client-side or server-side
+- **Trend detection** — line charts show if health is improving or degrading over time
+- **Comparative analysis** — summary cards and aggregated charts let operators compare across all uploads
+- **Proactive monitoring** — health distribution pie chart immediately shows how many uploads are "unhealthy"
+
+The SVG-based approach demonstrates that charting doesn't require heavy libraries for basic use cases. For production scale, libraries like Recharts, Chart.js, or D3 provide more features (animations, interactivity, zoom, export) with less custom code.
+
+The 15-second refresh interval is slower than the Jobs page (5 seconds) because insights change less frequently — they only update when new files are processed, not when job status changes during processing.
