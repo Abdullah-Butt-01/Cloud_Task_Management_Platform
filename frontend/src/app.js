@@ -7,6 +7,8 @@ import Dashboard from './Dashboard';
 
 import UploadPage from './Upload';
 
+import JobsPage from './Jobs';
+
 // Step 18: Placeholder pages — will be built in Steps 19-22
 
 const JobsPage = () => (

@@ -1,0 +1,284 @@
+/* Step 21: Jobs table styling */
+
+.jobs-page {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.jobs-page h1 {
+  font-size: 1.8rem;
+  color: #2c3e50;
+  margin: 0;
+}
+
+/* Header */
+.jobs-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.jobs-controls {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.filter-group label {
+  color: #7f8c8d;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.filter-select {
+  padding: 0.5rem 1rem;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  background: white;
+  cursor: pointer;
+  color: #2c3e50;
+}
+
+.filter-select:focus {
+  outline: none;
+  border-color: #3498db;
+  box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+}
+
+.jobs-count {
+  color: #7f8c8d;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+/* Table */
+.table-container {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  overflow-x: auto;
+}
+
+.jobs-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.jobs-table thead {
+  background: #f8f9fa;
+  border-bottom: 2px solid #e9ecef;
+}
+
+.jobs-table th {
+  padding: 0.875rem 1rem;
+  text-align: left;
+  font-weight: 600;
+  color: #495057;
+  white-space: nowrap;
+}
+
+.jobs-table th.right {
+  text-align: right;
+}
+
+.jobs-table th.sortable {
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.2s;
+}
+
+.jobs-table th.sortable:hover {
+  color: #3498db;
+}
+
+.jobs-table td {
+  padding: 0.875rem 1rem;
+  border-bottom: 1px solid #f0f0f0;
+  vertical-align: middle;
+}
+
+.jobs-table td.right {
+  text-align: right;
+}
+
+.jobs-table tbody tr:hover {
+  background: #f8f9fa;
+}
+
+/* Job row status colors */
+.job-row.status-completed {
+  border-left: 3px solid #28a745;
+}
+
+.job-row.status-processing {
+  border-left: 3px solid #f39c12;
+}
+
+.job-row.status-queued {
+  border-left: 3px solid #3498db;
+}
+
+.job-row.status-failed {
+  border-left: 3px solid #dc3545;
+}
+
+/* Status badges */
+.status-badge {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.status-completed {
+  background: #d4edda;
+  color: #155724;
+}
+
+.status-processing {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.status-queued {
+  background: #cce5ff;
+  color: #004085;
+}
+
+.status-failed {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.status-default {
+  background: #e9ecef;
+  color: #495057;
+}
+
+/* Cell styling */
+.job-id {
+  font-family: 'Courier New', monospace;
+  font-weight: 600;
+  color: #3498db;
+}
+
+.job-filename {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.error-count {
+  color: #dc3545;
+  font-weight: 600;
+}
+
+.job-date {
+  white-space: nowrap;
+  color: #6c757d;
+  font-size: 0.85rem;
+}
+
+/* Action link */
+.action-link {
+  color: #3498db;
+  text-decoration: none;
+  font-weight: 500;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.action-link:hover {
+  background: #e8f4fd;
+}
+
+/* No jobs */
+.no-jobs {
+  text-align: center;
+  padding: 3rem;
+  color: #7f8c8d;
+}
+
+.no-jobs a {
+  color: #3498db;
+  text-decoration: none;
+}
+
+.no-jobs a:hover {
+  text-decoration: underline;
+}
+
+/* Refresh indicator */
+.refresh-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  color: #7f8c8d;
+  font-size: 0.85rem;
+}
+
+.refresh-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #28a745;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+/* Loading and error states */
+.loading, .error {
+  padding: 3rem;
+  text-align: center;
+  font-size: 1.2rem;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+.error {
+  color: #dc3545;
+  background: #fdf2f2;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .jobs-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .jobs-table {
+    font-size: 0.8rem;
+  }
+
+  .jobs-table th,
+  .jobs-table td {
+    padding: 0.5rem 0.625rem;
+  }
+
+  .job-filename {
+    max-width: 120px;
+  }
+}

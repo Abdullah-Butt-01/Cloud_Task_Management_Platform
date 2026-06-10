@@ -2551,3 +2551,171 @@ Before this step, the only way to upload was via `curl`. Now the React frontend 
 - **Error clarity** — API validation errors surfaced in the UI, not just HTTP status codes
 
 The `FormData` + `multipart/form-data` pattern is the standard for file uploads in web applications. The proxy configuration in `package.json` (from Step 18) makes this seamless — no CORS configuration needed on the Flask backend.
+
+### Step 21 - Build Jobs Table
+
+#### Goal
+
+Replace the placeholder Jobs page with a real data table showing all processing jobs with filtering, sorting, status colors, and auto-refresh.
+
+#### What Was Already Present
+
+- Step 18 set up React routing with a placeholder Jobs page.
+- Step 19 built the real Dashboard with data fetching.
+- Step 20 built the Upload page with drag-and-drop and API connection.
+- The Flask API already exposed `GET /files` and `GET /files?status=<filter>`.
+- The API returned full job data including status, counts, processing time, timestamps.
+
+#### What Needed To Change
+
+The placeholder Jobs page was static text. It needed to become an interactive data table that:
+- Fetches all jobs from the API
+- Filters by status (all, queued, processing, completed, failed)
+- Sorts by any column (ID, filename, status, counts, duration, date)
+- Shows status badges with color coding
+- Auto-refreshes every 5 seconds to track job progress
+- Formats dates and durations for human readability
+- Handles empty states gracefully
+- Links to insight details (placeholder for Step 22)
+
+#### Changes Made
+
+**1. New Component: `frontend/src/Jobs.js`**
+
+Full jobs table component with:
+
+| Feature | Implementation |
+|---------|---------------|
+| Data fetching | `axios.get('/files')` or `axios.get('/files?status=X')` based on filter |
+| Status filter | `<select>` dropdown triggers re-fetch with `?status=` query param |
+| Sorting | Click column headers to sort; toggle asc/desc; handles nulls |
+| Status badges | Color-coded pills: green=completed, orange=processing, blue=queued, red=failed |
+| Auto-refresh | `setInterval(fetchJobs, 5000)` with cleanup on unmount |
+| Date formatting | `toLocaleString()` for readable timestamps |
+| Duration formatting | `<1s` shows milliseconds, `≥1s` shows seconds with 2 decimals |
+| Empty state | "No jobs found" with link to upload page |
+| Row styling | Left border color matches status for quick visual scanning |
+
+**Columns displayed:**
+
+| Column | Source | Notes |
+|--------|--------|-------|
+| ID | `file_job_id` | Monospace, blue color |
+| Filename | `original_filename` | Truncated with ellipsis, tooltip on hover |
+| Status | `status` | Badge with color |
+| Lines | `line_count` | Right-aligned |
+| 200 | `status_200_count` | Right-aligned |
+| Errors | `total_error_count` | Red color if > 0 |
+| Clients | `unique_client_count` | Right-aligned |
+| Duration | `processing_time` | Formatted (ms or s) |
+| Created | `created_at` | Formatted date |
+| Actions | — | "View" link (placeholder for Step 22) |
+
+**2. New Styles: `frontend/src/Jobs.css`**
+
+- Header with title, filter dropdown, job count
+- Responsive table with horizontal scroll on mobile
+- Sortable headers with hover highlight and arrow indicator
+- Status badges with rounded pill design
+- Row left border colored by status (green/orange/blue/red)
+- Pulsing green dot for auto-refresh indicator
+- Hover effects on rows
+- Responsive: stacked header on mobile, smaller fonts
+
+**3. Updated: `frontend/src/App.js`**
+
+Replaced inline placeholder `JobsPage` with `import JobsPage from './Jobs'`.
+
+#### Files Changed
+
+- `frontend/src/Jobs.js` — **new file**, real jobs table component
+- `frontend/src/Jobs.css` — **new file**, jobs table styling
+- `frontend/src/App.js` — **updated**, imports real JobsPage
+- `docs/LogProcessingMigration.md` — this documentation added
+
+#### Files Unchanged
+
+- All backend files — pure frontend change
+- `frontend/src/Dashboard.js` — dashboard unchanged
+- `frontend/src/Upload.js` — upload page unchanged
+- Insights placeholder — still placeholder (Step 22)
+
+#### How To Test
+
+Ensure Flask API is running on `http://localhost:5000`:
+
+```bash
+docker compose up -d
+```
+
+Start React dev server:
+
+```bash
+cd frontend
+npm start
+```
+
+Navigate to `http://localhost:3000/jobs`.
+
+**Test 1: Empty state**
+- With no jobs in database, verify: "No jobs found" message with link to upload page.
+
+**Test 2: Upload and watch**
+1. Go to `/upload` and upload `samples/nginx_access.log`
+2. Switch to `/jobs` immediately
+3. Verify: new job appears with `status: queued` (blue badge)
+4. Wait 5–10 seconds, verify: status changes to `processing` (orange) then `completed` (green)
+5. Verify: line count, 200 count, error count, client count, duration all populate
+
+**Test 3: Filter by status**
+1. Select "Completed" from filter dropdown
+2. Verify: only completed jobs shown, count updates
+3. Select "Failed" — should show empty if no failures
+4. Select "All" — all jobs return
+
+**Test 4: Sort by column**
+1. Click "ID" header — toggles asc/desc
+2. Click "Errors" header — jobs with most errors sort to top
+3. Click "Created" — newest/oldest first
+4. Verify arrow (↑/↓) appears on active sort column
+
+**Test 5: Upload multiple files**
+```bash
+for i in {1..5}; do
+  curl -X POST http://localhost:5000/upload -F "file=@samples/nginx_access.log"
+done
+```
+- Verify: all 5 jobs appear in table
+- Verify: job count shows "5 jobs"
+- Verify: table scrolls horizontally if screen is narrow
+
+**Test 6: Auto-refresh**
+- Upload a file, stay on `/jobs`
+- Watch status change from queued → processing → completed without manual refresh
+- Verify pulsing green dot indicates active refresh
+
+**Test 7: Error handling**
+- Stop Flask API while on `/jobs`
+- Verify: error message appears, no crash
+- Restart API, verify: data returns after next refresh cycle
+
+**Test 8: Cross-check with API**
+```bash
+curl http://localhost:5000/files
+curl "http://localhost:5000/files?status=completed"
+```
+- Verify React table matches API response data
+
+#### Concept Learned
+
+**Data tables need filtering, sorting, and live updates to be useful for operations.**
+
+Before this step, the only way to view jobs was via `curl` or the Jinja2 HTML table (which required full page reload). Now the React table provides:
+
+- **Filtering** — operators focus on failed jobs or monitor processing queue depth
+- **Sorting** — identify slowest jobs, most error-prone files, largest uploads
+- **Live updates** — track job progress without manual refresh (critical for background processing)
+- **Visual scanning** — color-coded status badges and row borders let operators spot issues at a glance
+- **Contextual actions** — "View" link will lead to detailed insight (Step 22)
+
+The 5-second refresh interval is a pragmatic choice for a background processing system: fast enough to feel responsive, slow enough to not overwhelm the API. For production, this could be replaced with WebSocket push or Server-Sent Events (SSE) to reduce polling overhead.
