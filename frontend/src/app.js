@@ -5,13 +5,9 @@ import './App.css';
 // Step 19: Real Dashboard page (replaces placeholder)
 import Dashboard from './Dashboard';
 
+import UploadPage from './Upload';
+
 // Step 18: Placeholder pages — will be built in Steps 19-22
-const UploadPage = () => (
-  <div className="page">
-    <h1>Upload Log File</h1>
-    <p>File upload interface will appear here (Step 20).</p>
-  </div>
-);
 
 const JobsPage = () => (
   <div className="page">

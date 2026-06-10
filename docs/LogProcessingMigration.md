@@ -2418,3 +2418,136 @@ Before this step, each metric lived on its own endpoint. Now the dashboard:
 - **Auto-refresh** — replaces the crude `<meta http-equiv="refresh">` from Jinja2
 
 This is the pattern used by Datadog, Grafana, and AWS CloudWatch dashboards: multiple data sources, one unified view, real-time updates, visual alerts.
+
+### Step 20 - Connect Upload API
+
+#### Goal
+
+Replace the placeholder Upload page with a real file upload interface that connects to the Flask API via drag-and-drop, file validation, and progress feedback.
+
+#### What Was Already Present
+
+- Step 18 set up React routing with a placeholder Upload page.
+- Step 19 built the real Dashboard with data fetching.
+- The Flask API already exposed `POST /upload` accepting multipart form data.
+- The API returned JSON with job details and RQ queue ID.
+
+#### What Needed To Change
+
+The placeholder Upload page was static text. It needed to become an interactive interface that:
+- Accepts files via click or drag-and-drop
+- Validates file type and size client-side before upload
+- Uploads to the Flask API using `axios` with `FormData`
+- Shows upload progress (spinner while uploading)
+- Displays success with job details (ID, filename, status, RQ job ID)
+- Shows errors with clear messages from API validation
+- Allows uploading another file without page reload
+
+#### Changes Made
+
+**1. New Component: `frontend/src/Upload.js`**
+
+Full upload component with:
+
+| Feature | Implementation |
+|---------|---------------|
+| Drag-and-drop | `onDragEnter`, `onDragOver`, `onDragLeave`, `onDrop` events on form |
+| File input | Hidden `<input type="file">` triggered by label click |
+| Client validation | Checks `.txt` / `.log` extension, 10MB size limit |
+| API upload | `axios.post('/upload', formData)` with `multipart/form-data` header |
+| Loading state | Spinner animation while uploading |
+| Success display | Result card with job ID, filename, status, RQ job ID |
+| Error display | Alert box with API error message |
+| Reset | "Upload Another File" button clears all state |
+
+**2. New Styles: `frontend/src/Upload.css`**
+
+- Drag zone with dashed border, highlight on drag-over
+- File selected display with icon, name, size, clear button
+- Upload button with hover lift effect
+- Spinner animation via CSS `@keyframes spin`
+- Result card with grid layout for job details
+- Status color coding (blue=queued, orange=processing, green=completed, red=failed)
+- Responsive: single column on mobile
+
+**3. Updated: `frontend/src/App.js`**
+
+Replaced inline placeholder `UploadPage` with `import UploadPage from './Upload'`.
+
+#### Files Changed
+
+- `frontend/src/Upload.js` — **new file**, real upload component
+- `frontend/src/Upload.css` — **new file**, upload styling
+- `frontend/src/App.js` — **updated**, imports real UploadPage
+- `docs/LogProcessingMigration.md` — this documentation added
+
+#### Files Unchanged
+
+- All backend files — pure frontend change
+- `frontend/src/Dashboard.js` — dashboard unchanged
+- Other placeholder pages (Jobs, Insights) — still placeholders
+
+#### How To Test
+
+Ensure Flask API is running on `http://localhost:5000`:
+
+```bash
+docker compose up -d
+```
+
+Start React dev server:
+
+```bash
+cd frontend
+npm start
+```
+
+Navigate to `http://localhost:3000/upload`.
+
+**Test 1: Click to upload**
+1. Click the upload zone
+2. Select a `.txt` or `.log` file from `samples/`
+3. Click "Upload and Process"
+4. Verify: spinner appears, then success card with job ID and status "queued"
+
+**Test 2: Drag and drop**
+1. Drag `samples/nginx_access.log` from file manager into the upload zone
+2. Verify: zone highlights on drag-over, file appears selected
+3. Click "Upload and Process"
+
+**Test 3: Validation**
+1. Try uploading a `.pdf` or `.jpg` file
+2. Verify: error message "Only .txt and .log files are allowed"
+
+**Test 4: Size limit**
+1. Create a file > 10MB: `dd if=/dev/zero of=bigfile.txt bs=1M count=11`
+2. Try uploading it
+3. Verify: error message "File size must be under 10MB"
+
+**Test 5: Upload another**
+1. After successful upload, click "Upload Another File"
+2. Verify: form resets, no previous file or result shown
+
+**Test 6: API error**
+1. Stop Flask API while on upload page
+2. Try uploading a file
+3. Verify: error message "Network Error" or similar
+
+**Test 7: Cross-check with API**
+```bash
+curl http://localhost:5000/files
+```
+Verify the uploaded file appears in the list.
+
+#### Concept Learned
+
+**Client-side validation + API upload with FormData.**
+
+Before this step, the only way to upload was via `curl`. Now the React frontend provides:
+- **Immediate feedback** — drag-and-drop is faster than terminal commands
+- **Client-side guards** — file type and size checks before network request
+- **Progress indication** — spinner shows the system is working
+- **Structured result** — job ID and status displayed clearly, not buried in terminal JSON
+- **Error clarity** — API validation errors surfaced in the UI, not just HTTP status codes
+
+The `FormData` + `multipart/form-data` pattern is the standard for file uploads in web applications. The proxy configuration in `package.json` (from Step 18) makes this seamless — no CORS configuration needed on the Flask backend.
