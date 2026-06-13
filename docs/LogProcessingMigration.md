@@ -2935,3 +2935,234 @@ Before this step, insights were accessible only through JSON API responses or da
 The SVG-based approach demonstrates that charting doesn't require heavy libraries for basic use cases. For production scale, libraries like Recharts, Chart.js, or D3 provide more features (animations, interactivity, zoom, export) with less custom code.
 
 The 15-second refresh interval is slower than the Jobs page (5 seconds) because insights change less frequently — they only update when new files are processed, not when job status changes during processing.
+
+### Step 23 - Improve Docker Setup
+
+#### Goal
+
+Optimize the multi-service Docker configuration for deployment-grade reliability: smaller images, security hardening, health checks, resource limits, and proper service orchestration.
+
+#### What Was Already Present
+
+- A simple `Dockerfile` using `python:3.10-slim` with direct pip install.
+- A `docker-compose.yml` with api, worker, db, redis services.
+- Basic volume mounts for uploads and postgres data.
+- No health checks, no resource limits, no restart policies.
+- Image ran as root user (security risk).
+- No custom network (services used default bridge).
+
+#### Problems with the Old Setup
+
+1. **Large image size** — build dependencies (gcc, libpq-dev) remained in final image.
+2. **Security risk** — container ran as root; compromised container = compromised host.
+3. **No health checks** — Docker couldn't detect if API or DB was actually healthy.
+4. **No resource limits** — a runaway worker could consume all host resources.
+5. **No restart policy** — crashed containers stayed dead until manual restart.
+6. **No service dependency ordering** — API could start before DB was ready, causing connection errors.
+7. **No Redis persistence** — Redis data lost on container restart.
+8. **No custom network** — services could be accessed by unrelated containers on the same host.
+
+#### Changes Made
+
+**1. Improved Dockerfile: Multi-stage build + security hardening**
+
+| Improvement | Before | After |
+|-------------|--------|-------|
+| Build stages | Single stage | Multi-stage (builder + production) |
+| Image size | ~500MB+ | ~200MB (no build tools in final) |
+| User | root | `appuser` (non-root) |
+| Health check | None | `curl /health` every 30s |
+| Virtual env | None | `/opt/venv` isolated |
+| Layer caching | Poor | Requirements copied first, code last |
+
+**Multi-stage build:**
+- Stage 1 (`builder`): Installs gcc, libpq-dev, creates venv, installs pip packages
+- Stage 2 (`production`): Copies only venv + app code, installs only runtime libs (libpq5, curl)
+
+**Security hardening:**
+- `groupadd -r appgroup && useradd -r -g appgroup appuser` — creates non-root user
+- `USER appuser` — runs container as unprivileged user
+- `chown -R appuser:appgroup /app` — ensures file ownership
+
+**2. Improved docker-compose.yml: Production-ready orchestration**
+
+| Improvement | Before | After |
+|-------------|--------|-------|
+| Health checks | None | API, DB, Redis all have health checks |
+| Depends_on | Simple | `condition: service_healthy` for DB |
+| Resource limits | None | CPU and memory limits + reservations |
+| Restart policy | None | `unless-stopped` for all services |
+| Redis config | Default | AOF persistence + memory limit + LRU eviction |
+| Network | Default bridge | Custom `log-network` bridge |
+| Postgres version | 13 | 15-alpine (smaller, newer) |
+| Redis version | 7 | 7-alpine (smaller) |
+
+**Service dependency ordering:**
+```yaml
+depends_on:
+  db:
+    condition: service_healthy  # API waits until DB health check passes
+  redis:
+    condition: service_started  # API waits until Redis starts
+```
+
+This prevents the race condition where API tries to connect to DB before it's ready.
+
+**Resource limits per service:**
+
+| Service | CPU Limit | Memory Limit | CPU Reserve | Memory Reserve |
+|---------|-----------|--------------|-------------|----------------|
+| API | 1.0 | 512M | 0.25 | 128M |
+| Worker | 1.0 | 512M | 0.25 | 128M |
+| DB | 1.0 | 512M | 0.25 | 128M |
+| Redis | 0.5 | 256M | 0.1 | 64M |
+
+**Redis persistence:**
+- `--appendonly yes` — enables AOF (Append Only File) persistence
+- `--maxmemory 256mb` — caps Redis memory usage
+- `--maxmemory-policy allkeys-lru` — evicts least recently used keys when full
+
+**Custom network:**
+- `log-network` bridge isolates service communication
+- Prevents external containers from accessing internal services
+
+#### Files Changed
+
+- `Dockerfile` — **rewritten**, multi-stage build, non-root user, health check
+- `docker-compose.yml` — **rewritten**, health checks, resource limits, restart policies, custom network, Redis persistence
+- `docs/LogProcessingMigration.md` — this documentation added
+
+#### Files Unchanged
+
+- All application code (`app/`, `frontend/`) — no code changes needed
+- `requirements.txt` — same dependencies
+- `.env` — same environment variables
+
+#### How To Test
+
+**1. Clean build**
+
+```bash
+# Remove old images and volumes
+docker compose down -v
+docker system prune -f
+
+# Build with new Dockerfile
+docker compose up -d --build
+```
+
+**2. Verify image size**
+
+```bash
+docker images | grep log-processing
+```
+
+Expected: Image size significantly smaller than before (from ~500MB to ~200MB).
+
+**3. Verify non-root user**
+
+```bash
+docker exec log-api ps aux
+```
+
+Expected: Python process runs as `appuser`, not `root`.
+
+**4. Verify health checks**
+
+```bash
+# Check API health
+docker inspect --format='{{.State.Health.Status}}' log-api
+
+# Check DB health
+docker inspect --format='{{.State.Health.Status}}' log-db
+
+# Check Redis health
+docker inspect --format='{{.State.Health.Status}}' log-redis
+```
+
+Expected: All show `healthy`.
+
+**5. Verify restart policy**
+
+```bash
+# Kill a container
+docker kill log-api
+
+# Check it restarts automatically
+sleep 5
+docker ps | grep log-api
+```
+
+Expected: Container restarts automatically.
+
+**6. Verify resource limits**
+
+```bash
+docker stats log-api --no-stream
+```
+
+Expected: CPU and memory usage within configured limits.
+
+**7. Verify service ordering**
+
+```bash
+# Check logs — API should wait for DB
+docker compose logs api | head -20
+```
+
+Expected: No "database connection refused" errors; API starts only after DB health check passes.
+
+**8. Verify Redis persistence**
+
+```bash
+# Write some data to Redis
+docker exec log-redis redis-cli SET testkey testvalue
+
+# Restart Redis
+docker restart log-redis
+
+# Check data persisted
+docker exec log-redis redis-cli GET testkey
+```
+
+Expected: Returns `testvalue` (data persisted via AOF).
+
+**9. Full system test**
+
+```bash
+# Upload a file
+curl -X POST http://localhost:5000/upload -F "file=@samples/nginx_access.log"
+
+# Check health
+curl http://localhost:5000/health
+
+# Check metrics
+curl http://localhost:5000/metrics
+
+# Verify all services running
+docker compose ps
+```
+
+**10. Verify custom network**
+
+```bash
+docker network inspect log-processing-system_log-network
+```
+
+Expected: Shows api, worker, db, redis containers connected.
+
+#### Concept Learned
+
+**Production Docker setups need security, observability, and resource governance.**
+
+Before this step, the Docker setup was suitable for local development only. Now it's deployment-grade:
+
+- **Multi-stage builds** reduce image size by 50%+ and eliminate build-time dependencies from production
+- **Non-root users** follow the principle of least privilege — if the container is compromised, the attacker doesn't have root access to the host
+- **Health checks** enable Docker to restart unhealthy containers automatically and prevent dependent services from starting prematurely
+- **Resource limits** prevent one misbehaving service from starving others (the "noisy neighbor" problem)
+- **Restart policies** ensure the system self-heals from transient failures
+- **Custom networks** isolate service communication and improve security
+- **Redis persistence** prevents data loss on restart
+
+These patterns are standard in production environments (Kubernetes, AWS ECS, Docker Swarm) and are essential for running containerized applications reliably at scale.

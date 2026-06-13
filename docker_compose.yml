@@ -1,0 +1,134 @@
+# Step 23: Optimized multi-service Docker configuration
+# Production-ready with health checks, resource limits, and proper networking
+
+version: "3.9"
+
+services:
+  # --- API Service ---
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: log-api
+    command: python -m app.main
+    ports:
+      - "5000:5000"
+    env_file:
+      - .env
+    environment:
+      - FLASK_ENV=production
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    volumes:
+      - ${HOST_UPLOAD_FOLDER:-./uploads}:${UPLOAD_FOLDER:-/app/uploads}
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - log-network
+
+  # --- Worker Service ---
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: log-worker
+    command: python -m app.worker
+    env_file:
+      - .env
+    environment:
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    volumes:
+      - ${HOST_UPLOAD_FOLDER:-./uploads}:${UPLOAD_FOLDER:-/app/uploads}
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+    restart: unless-stopped
+    networks:
+      - log-network
+
+  # --- Database Service ---
+  db:
+    image: postgres:15-alpine
+    container_name: log-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: tasks
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d tasks"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+    restart: unless-stopped
+    networks:
+      - log-network
+
+  # --- Redis Service ---
+  redis:
+    image: redis:7-alpine
+    container_name: log-redis
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+    restart: unless-stopped
+    networks:
+      - log-network
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  log-network:
+    driver: bridge
