@@ -53,7 +53,11 @@ def get_insight(insight_id):
             "original_filename": insight.file_job.original_filename,
             "status": insight.file_job.status,
             "processing_time": insight.file_job.processing_time,
-            "created_at": insight.file_job.created_at.isoformat() if insight.file_job.created_at else None,
+            "created_at": (
+                insight.file_job.created_at.isoformat()
+                if insight.file_job.created_at
+                else None
+            ),
         }
 
     log_message("API", f"Insight retrieved id={insight_id}")
@@ -87,8 +91,8 @@ def health_summary():
             "unhealthy": unhealthy,
             "unknown": unknown,
         },
-        "average_health_score": round(float(avg_score), 3) if avg_score else None,
-        "healthy_percentage": round((healthy / total) * 100, 1) if total else 0,
+        "average_health_score": (round(float(avg_score), 3) if avg_score else None),
+        "healthy_percentage": (round((healthy / total) * 100, 1) if total else 0),
     }
 
     log_message("API", f"Health summary generated: {summary}")

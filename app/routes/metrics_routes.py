@@ -35,16 +35,22 @@ def system_metrics():
     completed_jobs = FileJob.query.filter_by(status="completed").count()
     failed_jobs = FileJob.query.filter_by(status="failed").count()
 
-    avg_processing_time = db.session.query(
-        func.avg(FileJob.processing_time)
-    ).filter(FileJob.status == "completed").scalar()
+    avg_processing_time = (
+        db.session.query(func.avg(FileJob.processing_time))
+        .filter(FileJob.status == "completed")
+        .scalar()
+    )
 
     total_retries = db.session.query(func.sum(FileJob.retry_count)).scalar() or 0
 
     # --- Error Metrics ---
     total_errors = db.session.query(func.sum(FileJob.total_error_count)).scalar() or 0
-    total_client_errors = db.session.query(func.sum(FileJob.client_error_count)).scalar() or 0
-    total_server_errors = db.session.query(func.sum(FileJob.server_error_count)).scalar() or 0
+    total_client_errors = (
+        db.session.query(func.sum(FileJob.client_error_count)).scalar() or 0
+    )
+    total_server_errors = (
+        db.session.query(func.sum(FileJob.server_error_count)).scalar() or 0
+    )
 
     # --- Insight Health Metrics ---
     total_insights = LogInsight.query.count()
@@ -59,6 +65,7 @@ def system_metrics():
 
     # --- Worker Metrics ---
     from redis import Redis
+
     r = Redis(host="redis", port=6379, decode_responses=True)
     worker_keys = r.keys("worker:*:heartbeat")
     worker_count = len(worker_keys)
@@ -83,10 +90,12 @@ def system_metrics():
             "processing": processing_jobs,
             "completed": completed_jobs,
             "failed": failed_jobs,
-            "success_rate": round(
-                (completed_jobs / total_jobs) * 100, 1
-            ) if total_jobs else 0,
-            "average_processing_time": round(float(avg_processing_time), 3) if avg_processing_time else None,
+            "success_rate": (
+                round((completed_jobs / total_jobs) * 100, 1) if total_jobs else 0
+            ),
+            "average_processing_time": (
+                round(float(avg_processing_time), 3) if avg_processing_time else None
+            ),
             "total_retries": int(total_retries),
         },
         "errors": {
@@ -99,7 +108,9 @@ def system_metrics():
             "healthy": healthy_insights,
             "degraded": degraded_insights,
             "unhealthy": unhealthy_insights,
-            "average_health_score": round(float(avg_health_score), 3) if avg_health_score else None,
+            "average_health_score": (
+                round(float(avg_health_score), 3) if avg_health_score else None
+            ),
         },
         "queue": {
             "pending_jobs": queue_size,
@@ -114,6 +125,10 @@ def system_metrics():
         },
     }
 
-    log_message("API", f"Metrics generated: jobs={total_jobs} insights={total_insights} workers={alive_workers}/{worker_count}")
+    log_message(
+        "API",
+        f"Metrics generated: jobs={total_jobs} insights={total_insights} "
+        f"workers={alive_workers}/{worker_count}",
+    )
 
     return success_response(metrics)

@@ -12,6 +12,7 @@ def check_database():
     """Check PostgreSQL connectivity by executing a simple query."""
     try:
         from sqlalchemy import text
+
         db.session.execute(text("SELECT 1"))
         return {
             "status": "up",
@@ -43,6 +44,7 @@ def check_workers():
     """Check worker health via heartbeat keys in Redis."""
     try:
         from redis import Redis
+
         r = Redis(host="redis", port=6379, decode_responses=True)
 
         keys = r.keys("worker:*:heartbeat")
@@ -141,7 +143,10 @@ def health_check():
 
     if "down" in critical_services:
         overall_status = "unhealthy"
-    elif any(check["status"] != "up" for check in [db_check, redis_check, worker_check, queue_check]):
+    elif any(
+        check["status"] != "up"
+        for check in [db_check, redis_check, worker_check, queue_check]
+    ):
         overall_status = "degraded"
     else:
         overall_status = "healthy"
@@ -160,7 +165,10 @@ def health_check():
 
     log_message(
         "API",
-        f"Health check: status={overall_status} db={db_check['status']} redis={redis_check['status']} workers={worker_check.get('active_workers', 0)}/{worker_check.get('total_workers', 0)}"
+        f"Health check: status={overall_status} db={db_check['status']} "
+        f"redis={redis_check['status']} "
+        f"workers={worker_check.get('active_workers', 0)}/"
+        f"{worker_check.get('total_workers', 0)}",
     )
 
     # Return 503 if unhealthy, 200 otherwise

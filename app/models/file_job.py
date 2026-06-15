@@ -1,4 +1,3 @@
-
 from datetime import datetime
 
 from ..extensions import db
@@ -36,9 +35,7 @@ class FileJob(db.Model):
     started_at = db.Column(db.DateTime, nullable=True)
     completed_at = db.Column(db.DateTime, nullable=True)
     updated_at = db.Column(
-        db.DateTime,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow
+        db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
 
     def to_dict(self):
@@ -58,17 +55,21 @@ class FileJob(db.Model):
             "client_error_count": self.client_error_count,
             "server_error_count": self.server_error_count,
             "unique_client_count": self.unique_client_count,
-            "unique_client_ips": self.unique_client_ips.split(",") if self.unique_client_ips else [],
+            "unique_client_ips": (
+                self.unique_client_ips.split(",") if self.unique_client_ips else []
+            ),
             # Step 10: Include endpoint ranking in API response
             "top_endpoints": self._parse_top_endpoints(),
             "total_endpoints": self.total_endpoints,
             "retry_count": self.retry_count,
             "error_message": self.error_message,
             "rq_job_id": self.rq_job_id,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
-            "started_at": self.started_at.isoformat() if self.started_at else None,
-            "completed_at": self.completed_at.isoformat() if self.completed_at else None,
-            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "created_at": (self.created_at.isoformat() if self.created_at else None),
+            "started_at": (self.started_at.isoformat() if self.started_at else None),
+            "completed_at": (
+                self.completed_at.isoformat() if self.completed_at else None
+            ),
+            "updated_at": (self.updated_at.isoformat() if self.updated_at else None),
         }
 
     def _parse_top_endpoints(self):
@@ -76,6 +77,7 @@ class FileJob(db.Model):
         if not self.top_endpoints:
             return []
         import json
+
         try:
             return json.loads(self.top_endpoints)
         except json.JSONDecodeError:

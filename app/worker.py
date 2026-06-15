@@ -47,18 +47,17 @@ def send_heartbeat(worker_name):
             }
 
             # Step 15: Use SET with EX (TTL) — if worker dies, key auto-expires
-            r.set(
-                f"worker:{worker_name}:heartbeat",
-                now,
-                ex=HEARTBEAT_TTL
-            )
+            r.set(f"worker:{worker_name}:heartbeat", now, ex=HEARTBEAT_TTL)
             # Also store enriched metadata (separate key, same TTL)
-            r.hset(f"worker:{worker_name}:info", mapping={
-                "status": "active",
-                "started_at": datetime.utcnow().isoformat(),
-                "uptime_seconds": uptime_seconds,
-                "consecutive_beats": consecutive_beats,
-            })
+            r.hset(
+                f"worker:{worker_name}:info",
+                mapping={
+                    "status": "active",
+                    "started_at": datetime.utcnow().isoformat(),
+                    "uptime_seconds": uptime_seconds,
+                    "consecutive_beats": consecutive_beats,
+                },
+            )
             r.expire(f"worker:{worker_name}:info", HEARTBEAT_TTL)
 
             log_message(
@@ -87,17 +86,18 @@ if __name__ == "__main__":
         worker_name = socket.gethostname()
 
         # Step 15: Register worker start in Redis
-        r.hset(f"worker:{worker_name}:info", mapping={
-            "status": "starting",
-            "started_at": datetime.utcnow().isoformat(),
-            "hostname": worker_name,
-        })
+        r.hset(
+            f"worker:{worker_name}:info",
+            mapping={
+                "status": "starting",
+                "started_at": datetime.utcnow().isoformat(),
+                "hostname": worker_name,
+            },
+        )
         r.expire(f"worker:{worker_name}:info", HEARTBEAT_TTL)
 
         thread = threading.Thread(
-            target=send_heartbeat,
-            args=(worker_name,),
-            daemon=True
+            target=send_heartbeat, args=(worker_name,), daemon=True
         )
         thread.start()
 

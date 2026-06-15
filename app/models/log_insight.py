@@ -14,8 +14,10 @@ class LogInsight(db.Model):
     id = db.Column(db.Integer, primary_key=True)
 
     # Foreign key linking back to the source file job
-    file_job_id = db.Column(db.Integer, db.ForeignKey('file_job.id'), nullable=False, unique=True)
-    file_job = db.relationship('FileJob', backref=db.backref('insight', uselist=False))
+    file_job_id = db.Column(
+        db.Integer, db.ForeignKey("file_job.id"), nullable=False, unique=True
+    )
+    file_job = db.relationship("FileJob", backref=db.backref("insight", uselist=False))
 
     # --- Traffic Volume ---
     total_requests = db.Column(db.Integer, default=0)
@@ -51,9 +53,7 @@ class LogInsight(db.Model):
     # --- Metadata ---
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(
-        db.DateTime,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow
+        db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
 
     def calculate_health_score(self):
@@ -83,6 +83,7 @@ class LogInsight(db.Model):
         if not self.top_endpoints:
             return []
         import json
+
         try:
             return json.loads(self.top_endpoints)
         except json.JSONDecodeError:
@@ -98,11 +99,9 @@ class LogInsight(db.Model):
         return {
             "insight_id": self.id,
             "file_job_id": self.file_job_id,
-
             # Traffic
             "total_requests": self.total_requests,
             "total_lines": self.total_lines,
-
             # Status codes
             "status_200_count": self.status_200_count,
             "status_404_count": self.status_404_count,
@@ -112,25 +111,20 @@ class LogInsight(db.Model):
             "status_401_count": self.status_401_count,
             "status_403_count": self.status_403_count,
             "status_504_count": self.status_504_count,
-
             # Errors
             "total_error_count": self.total_error_count,
             "client_error_count": self.client_error_count,
             "server_error_count": self.server_error_count,
-
             # Clients
             "unique_client_count": self.unique_client_count,
             "unique_client_ips": self._parse_client_ips(),
-
             # Endpoints
             "total_endpoints": self.total_endpoints,
             "top_endpoints": self._parse_top_endpoints(),
-
             # Health
             "health_score": self.health_score,
             "health_status": self.health_status,
-
             # Metadata
-            "created_at": self.created_at.isoformat() if self.created_at else None,
-            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "created_at": (self.created_at.isoformat() if self.created_at else None),
+            "updated_at": (self.updated_at.isoformat() if self.updated_at else None),
         }

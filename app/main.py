@@ -25,6 +25,7 @@ def create_app(init_db=True, start_background_scheduler=True):
 
     if start_background_scheduler:
         from app.scheduler import start_scheduler
+
         start_scheduler(app)
 
     if init_db:
@@ -39,21 +40,27 @@ def create_app(init_db=True, start_background_scheduler=True):
                 time.sleep(2)
 
     from app.routes.system_routes import system_bp
+
     app.register_blueprint(system_bp)
 
     from app.routes.file_routes import file_bp
+
     app.register_blueprint(file_bp)
 
     from app.routes.insight_routes import insight_bp
+
     app.register_blueprint(insight_bp)
 
     from app.routes.metrics_routes import metrics_bp
+
     app.register_blueprint(metrics_bp)
 
     from app.routes.queue_routes import queue_bp
+
     app.register_blueprint(queue_bp)
 
     from app.routes.health_routes import health_bp
+
     app.register_blueprint(health_bp)
 
     return app

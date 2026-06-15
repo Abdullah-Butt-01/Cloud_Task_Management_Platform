@@ -32,10 +32,10 @@ def queue_status():
 
     # Throughput estimate: completed jobs in last hour
     from datetime import datetime, timedelta
+
     one_hour_ago = datetime.utcnow() - timedelta(hours=1)
     recent_completed = FileJob.query.filter(
-        FileJob.status == "completed",
-        FileJob.completed_at >= one_hour_ago
+        FileJob.status == "completed", FileJob.completed_at >= one_hour_ago
     ).count()
 
     # Health signal
@@ -76,7 +76,8 @@ def queue_status():
 
     log_message(
         "API",
-        f"Queue status: pending={pending_rq_jobs} health={health} throughput={recent_completed}/hour"
+        f"Queue status: pending={pending_rq_jobs} health={health} "
+        f"throughput={recent_completed}/hour",
     )
 
     return success_response(metrics)

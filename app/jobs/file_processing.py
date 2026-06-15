@@ -13,9 +13,7 @@ MAX_RETRIES = 3
 SUPPORTED_EXTENSIONS = {".txt", ".log"}
 NGINX_STATUS_PATTERN = re.compile(r'"\s(?P<status_code>\d{3})\s')
 NGINX_CLIENT_IP_PATTERN = re.compile(r"^(?P<client_ip>\S+)\s")
-NGINX_ENDPOINT_PATTERN = re.compile(
-    r'"(?P<method>\S+)\s+(?P<endpoint>\S+)\s+HTTP'
-)
+NGINX_ENDPOINT_PATTERN = re.compile(r'"(?P<method>\S+)\s+(?P<endpoint>\S+)\s+HTTP')
 
 
 def calculate_processing_time(started_at, completed_at):
@@ -107,12 +105,15 @@ def extract_and_rank_endpoints(content, top_n=5):
         endpoint = match.group("endpoint")
         key = f"{method} {endpoint}"
         if key not in endpoint_counts:
-            endpoint_counts[key] = {"endpoint": endpoint, "method": method, "count": 0}
+            endpoint_counts[key] = {
+                "endpoint": endpoint,
+                "method": method,
+                "count": 0,
+            }
         endpoint_counts[key]["count"] += 1
 
     sorted_endpoints = sorted(
-        endpoint_counts.values(),
-        key=lambda x: (-x["count"], x["endpoint"])
+        endpoint_counts.values(), key=lambda x: (-x["count"], x["endpoint"])
     )
     return {
         "total_endpoints": len(endpoint_counts),
@@ -121,7 +122,9 @@ def extract_and_rank_endpoints(content, top_n=5):
 
 
 # Step 11: New function to create or update LogInsight record
-def save_log_insight(file_job, status_counts, unique_client_ips, endpoint_data, line_count):
+def save_log_insight(
+    file_job, status_counts, unique_client_ips, endpoint_data, line_count
+):
     """
     Create or update a LogInsight record linked to the given FileJob.
 
@@ -137,7 +140,16 @@ def save_log_insight(file_job, status_counts, unique_client_ips, endpoint_data, 
         db.session.add(insight)
 
     # Traffic volume
-    insight.total_requests = status_counts["status_200_count"] + status_counts["status_301_count"] + status_counts["status_302_count"] + status_counts["status_401_count"] + status_counts["status_403_count"] + status_counts["status_404_count"] + status_counts["status_500_count"] + status_counts["status_504_count"]
+    insight.total_requests = (
+        status_counts["status_200_count"]
+        + status_counts["status_301_count"]
+        + status_counts["status_302_count"]
+        + status_counts["status_401_count"]
+        + status_counts["status_403_count"]
+        + status_counts["status_404_count"]
+        + status_counts["status_500_count"]
+        + status_counts["status_504_count"]
+    )
     insight.total_lines = line_count
 
     # Status codes
@@ -170,7 +182,8 @@ def save_log_insight(file_job, status_counts, unique_client_ips, endpoint_data, 
 
     log_message(
         "WORKER",
-        f"LogInsight saved health_score={insight.health_score} status={insight.health_status}",
+        f"LogInsight saved health_score={insight.health_score} "
+        f"status={insight.health_status}",
         file_job_id=file_job.id,
     )
 
@@ -253,7 +266,7 @@ def process_text_file(file_job_id):
 
         log_message(
             "WORKER",
-            f"File processing failed error={error} attempt={file_job.retry_count}",
+            f"File processing failed error={error} " f"attempt={file_job.retry_count}",
             file_job_id=file_job.id,
             level=logging.ERROR,
         )
@@ -268,7 +281,7 @@ def process_text_file(file_job_id):
 
             log_message(
                 "WORKER",
-                f"File processing retry queued: attempt={file_job.retry_count}",
+                f"File processing retry queued: " f"attempt={file_job.retry_count}",
                 file_job_id=file_job.id,
                 level=logging.WARNING,
             )

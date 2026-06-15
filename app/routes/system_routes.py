@@ -22,7 +22,7 @@ def home():
         "insights_endpoint": "GET /insights",
         "metrics_endpoint": "GET /metrics",
         "queue_endpoint": "GET /queue/status",
-        "health_endpoint": "GET /health"
+        "health_endpoint": "GET /health",
     }
 
 
@@ -47,16 +47,18 @@ def debug_workers():
 
         if last_seen_raw is None:
             # Key expired — worker is dead or never started properly
-            workers.append({
-                "worker": worker_name,
-                "status": "dead",
-                "last_seen": None,
-                "seconds_since_heartbeat": None,
-                "ttl_remaining": 0,
-                "uptime_seconds": None,
-                "consecutive_beats": None,
-                "reason": "Redis key expired — worker stopped sending heartbeats",
-            })
+            workers.append(
+                {
+                    "worker": worker_name,
+                    "status": "dead",
+                    "last_seen": None,
+                    "seconds_since_heartbeat": None,
+                    "ttl_remaining": 0,
+                    "uptime_seconds": None,
+                    "consecutive_beats": None,
+                    "reason": "Redis key expired — worker stopped sending heartbeats",
+                }
+            )
             continue
 
         last_seen = float(last_seen_raw)
@@ -76,17 +78,19 @@ def debug_workers():
         else:
             status = "active"
 
-        workers.append({
-            "worker": worker_name,
-            "status": status,
-            "last_seen": last_seen,
-            "last_seen_iso": datetime.utcfromtimestamp(last_seen).isoformat(),
-            "seconds_since_heartbeat": seconds_since,
-            "ttl_remaining": ttl,
-            "uptime_seconds": float(uptime) if uptime else None,
-            "consecutive_beats": int(beats) if beats else None,
-            "started_at": started_at,
-        })
+        workers.append(
+            {
+                "worker": worker_name,
+                "status": status,
+                "last_seen": last_seen,
+                "last_seen_iso": datetime.utcfromtimestamp(last_seen).isoformat(),
+                "seconds_since_heartbeat": seconds_since,
+                "ttl_remaining": ttl,
+                "uptime_seconds": float(uptime) if uptime else None,
+                "consecutive_beats": int(beats) if beats else None,
+                "started_at": started_at,
+            }
+        )
 
     # Step 15: Also check for workers that have info but no heartbeat (starting up)
     info_keys = r.keys("worker:*:info")
@@ -95,17 +99,19 @@ def debug_workers():
         heartbeat_key = f"worker:{worker_name}:heartbeat"
         if heartbeat_key not in keys:
             info = r.hgetall(info_key) or {}
-            workers.append({
-                "worker": worker_name,
-                "status": "starting",
-                "last_seen": None,
-                "seconds_since_heartbeat": None,
-                "ttl_remaining": r.ttl(info_key),
-                "uptime_seconds": None,
-                "consecutive_beats": None,
-                "started_at": info.get("started_at"),
-                "reason": "Worker registered but heartbeat not yet active",
-            })
+            workers.append(
+                {
+                    "worker": worker_name,
+                    "status": "starting",
+                    "last_seen": None,
+                    "seconds_since_heartbeat": None,
+                    "ttl_remaining": r.ttl(info_key),
+                    "uptime_seconds": None,
+                    "consecutive_beats": None,
+                    "started_at": info.get("started_at"),
+                    "reason": "Worker registered but heartbeat not yet active",
+                }
+            )
 
     return success_response(workers)
 
