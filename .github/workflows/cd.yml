@@ -75,9 +75,25 @@ jobs:
           log-public-key: false
 
       - name: Add VM to known hosts
+        env:
+          VM_HOST: ${{ secrets.VM_HOST }}
         run: |
           mkdir -p ~/.ssh
-          ssh-keyscan -H ${{ secrets.VM_HOST }} >> ~/.ssh/known_hosts
+           if [ -z "$VM_HOST" ]; then
+             echo "ERROR: VM_HOST secret is not set or is empty"
+           exit 1
+           fi
+          echo "Scanning host: $VM_HOST"
+          ssh-keyscan -H "$VM_HOST" >> ~/.ssh/known_hosts 2>&1 || {
+            echo "ssh-keyscan failed. Trying with IP resolution..."
+            IP=$(dig +short "$VM_HOST" | head -1)
+            if [ -n "$IP" ]; then
+              ssh-keyscan -H "$IP" >> ~/.ssh/known_hosts
+            else
+              echo "Could not resolve $VM_HOST"
+              exit 1
+            fi
+          }
 
       # Step 25: Ensure remote directory exists
       - name: Create remote directory
